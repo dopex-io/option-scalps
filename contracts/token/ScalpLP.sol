@@ -12,7 +12,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {OptionScalp} from '../OptionScalp.sol';
 
 /**
- * @title Dopex SSOV V3 ERC20 Options Token
+ * @title Scalp LP Token
  */
 contract ScalpLP is ERC4626 {
 

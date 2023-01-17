@@ -20,7 +20,6 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IGmxRouter} from "./interface/IGmxRouter.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
-// Uncomment this line to use console.log
 import "hardhat/console.sol";
 
 contract OptionScalp is
