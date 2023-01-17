@@ -1,0 +1,22 @@
+{
+  "name": "option-scalps",
+  "author": {
+    "name": "tztokchad",
+    "email": "tz@dopex.io"
+  },
+  "scripts": {
+    "clean": "rimraf cache artifacts types",
+    "compile": "hardhat compile",
+    "coverage": "hardhat coverage",
+    "size": "hardhat size-contracts",
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.1",
+    "hardhat": "^2.12.6"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.8.1",
+    "solmate": "^6.6.1"
+  }
+}
