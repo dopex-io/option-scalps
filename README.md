@@ -1,6 +1,6 @@
 # Option scalps
 
-Short timeframe scalps powered by Atlantic options. 
+git remote add origin git@github.com:tztokchad/option-scalps.git 
 
 Buyers get access to long or short positions for upto 1 hour by only paying option premium (<$10 for 1 eth for 15m @ $1600/ETH) and posting margin to set their liquidation price. Collateral is borrowed and used to purchase the base asset.
 
