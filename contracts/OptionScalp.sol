@@ -41,6 +41,8 @@ Pausable {
     IVolatilityOracle public volatilityOracle;
     // Price oracle
     IPriceOracle public priceOracle;
+    // Scalp position minter
+    ScalpPositionMinter public scalpPositionMinter;
 
     // GMX Helper
     IGmxHelper public gmxHelper;
@@ -66,9 +68,9 @@ Pausable {
     uint public minimumAbsoluteLiquidationThreshold = 5e6; // $5
 
     uint public constant divisor = 1e8;
-    
-    // Position count
-    uint public count;
+
+    // Scalp positions
+    mapping(uint => ScalpPosition) public scalpPositions;
 
     struct ScalpPosition {
         // Is position open
@@ -82,9 +84,9 @@ Pausable {
         // Margin provided
         uint margin;
         // Premium for position
-        int premium;
+        uint premium;
         // Fees for position
-        int fees;
+        uint fees;
         // Final PNL of position
         int pnl;
         // Opened at timestamp
@@ -231,13 +233,13 @@ Pausable {
         uint premium = calcPremium(getMarkPrice(), size, timeframes[timeframeIndex]);
 
         // Calculate opening fees in quote
-        uint openingFees = calcFees(true, size / 10 ** 2);
+        uint openingFees = calcFees(size / 10 ** 2);
 
         // Total fees in quote
         uint totalFee = premium + openingFees;
 
         // Transfer fees + margin
-        quote.transferFrom(msg.sender, (totalFee + margin));
+        quote.transferFrom(msg.sender, address(this), (totalFee + margin));
 
         // Transfer fees to LP
         scalpLp.addProceeds(totalFee);
@@ -247,20 +249,25 @@ Pausable {
 
         // Swap to base assets
         uint swapped = _swapUsingGmxExactOut(
-            quote,
-            base,
+            address(quote),
+            address(base),
             size / getMarkPrice()
         );
 
+        // 1e18 / 1e6 * x = 1e8
+        // 1e8 * 1e6 / 1e18
+
+        uint entry = swapped / size *  (base.decimals() / (divisor * quote.decimals()));
         // Generate scalp position NFT
-        id = ScalpPositionMinter.mint(msg.sender);
+        id = scalpPositionMinter.mint(msg.sender);
         scalpPositions[id] = ScalpPosition({
             isOpen: true,
             size: size,
             swapped: swapped,
+            entry: entry,
             margin: margin,
             premium: premium,
-            fees: fees,
+            fees: openingFees,
             pnl: 0,
             openedAt: block.timestamp,
             timeframe: timeframes[timeframeIndex]
@@ -275,7 +282,6 @@ Pausable {
 
     /// @notice Closes an open position
     /// @param id Closes an open position
-    /// @param minAmountOut Minimum amount to receive when swapping back swapped assets
     function closePosition(
         uint id
     ) public {
@@ -287,18 +293,18 @@ Pausable {
 
         // Swap back to quote asset
         uint finalSize = _swapUsingGmxExactOut(
-            base,
-            quote,
-            gmxHelper.getAmountOut(address(quote), address(base), amountIn)
+            address(base),
+            address(quote),
+            gmxHelper.getAmountOut(address(quote), address(base), scalpPositions[id].swapped)
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
         scalpLp.unlockLiquidity(scalpPositions[id].size);
         if (pnl > 0) {
-            quote.transfer(msg.sender, scalpPositions[id].margin + pnl);
+            quote.transfer(msg.sender, (uint)((int)(scalpPositions[id].margin) + pnl));
         } else {
-            require(scalpPositions[id].margin > pnl, "Insufficient margin");
-            quote.transfer(msg.sender, (uint)((int)scalpPositions[id].margin + pnl));
+            require((int)(scalpPositions[id].margin) > pnl, "Insufficient margin");
+            quote.transfer(msg.sender, (uint)((int)(scalpPositions[id].margin) + pnl));
         }
         emit ClosePosition(
             id,
@@ -319,20 +325,20 @@ Pausable {
         // Swap back to quote asset
         uint amountIn = scalpPositions[id].swapped;
         uint finalSize = _swapUsingGmxExactOut(
-            base,
-            quote,
+            address(base),
+            address(quote),
             gmxHelper.getAmountOut(address(quote), address(base), amountIn)
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
         scalpLp.unlockLiquidity(scalpPositions[id].size);
         if (pnl > 0) {
-            quote.transfer(positionOwner, scalpPositions[id].margin + pnl);
+            quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
         } else {
-            if (scalpPositions[id].margin > pnl)
-                quote.transfer(positionOwner, (uint)((int)scalpPositions[id].margin + pnl));
+            if ((int)(scalpPositions[id].margin) > pnl)
+                quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
         }
-        emit Liquidate(
+        emit LiquidatePosition(
             id,
             pnl,
             msg.sender
@@ -362,24 +368,24 @@ Pausable {
         uint id
     ) public {
         require(scalpPositions[id].isOpen, "Invalid position ID");
-        require(scalpPositions[id].openedAt + timeframe >= block.timestamp, "Position has not expired");
+        require(scalpPositions[id].openedAt + scalpPositions[id].timeframe >= block.timestamp, "Position has not expired");
         require(!isLiquidatable(id), "Please call liquidate()");
 
         address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
         // Swap back to quote asset
         uint finalSize = _swapUsingGmxExactOut(
-            base,
-            quote,
-            gmxHelper.getAmountOut(address(quote), address(base), amountIn)
+            address(base),
+            address(quote),
+            gmxHelper.getAmountOut(address(quote), address(base), scalpPositions[id].swapped)
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
         scalpLp.unlockLiquidity(scalpPositions[id].size);
         if (pnl > 0) {
-            quote.transfer(positionOwner, scalpPositions[id].margin + pnl);
+            quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
         } else {
-            require(scalpPositions[id].margin > pnl, "Insufficient margin");
-            quote.transfer(positionOwner, (uint)((int)scalpPositions[id].margin + pnl));
+            require((int)(scalpPositions[id].margin) > pnl, "Insufficient margin");
+            quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
         }
         emit ExpirePosition(
             id,
@@ -418,6 +424,7 @@ Pausable {
         uint timeToExpiry
     )
     internal
+    view
     returns (uint premium) {
         premium = (uint(optionPricing.getOptionPrice(
             false, // ATM options: does not matter if call or put
@@ -431,7 +438,6 @@ Pausable {
     }
 
     /// @notice Internal function to calculate fees
-    /// @param openingPosition True if is opening position (else is closing)
     /// @param amount Value of option in USD (ie6)
     function calcFees(
         uint amount

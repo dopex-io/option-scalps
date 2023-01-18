@@ -2,9 +2,9 @@
 pragma solidity ^0.8.9;
 
 // Contracts
-import {ERC20} from "solmate/tokens/ERC20.sol";
-import {ERC4626} from "solmate/mixins/ERC4626.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
 // Libraries
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
@@ -48,7 +48,7 @@ contract ScalpLP is ERC4626 {
         address _collateral,
         string memory _underlyingSymbol,
         string memory _collateralSymbol
-    ) ERC4626(IERC20(_collateral)) {
+    ) ERC4626(ERC20(_collateral), "Scalp LP Token", "ScLP") {
         scalp = OptionScalp(_scalp);
         underlyingSymbol = _underlyingSymbol;
         collateralSymbol = _collateralSymbol;
@@ -82,21 +82,21 @@ contract ScalpLP is ERC4626 {
         return _totalAssets - _lockedLiquidity;
     }
 
-    function lockLiquidity(uint amount) {
+    function lockLiquidity(uint amount) public  {
         require(msg.sender == address(scalp), "Only scalp can call this function");
         _lockedLiquidity += amount;
     }
 
-    function unlockLiquidity(uint amount) {
+    function unlockLiquidity(uint amount) public {
         require(msg.sender == address(scalp), "Only scalp can call this function");
         _lockedLiquidity -= amount;
     }
 
     // Adds premium and fees to total available assets
-    function addProceeds(uint proceeds) {
+    function addProceeds(uint proceeds) public {
         require(msg.sender == address(scalp), "Only scalp can call this function");
         collateral.safeTransferFrom(msg.sender, address(this), proceeds);
-        _totalAssets += fees;
+        _totalAssets += proceeds;
     }
 
     function beforeWithdraw(uint256 assets, uint256 /*shares*/ ) internal virtual override {
@@ -114,8 +114,8 @@ contract ScalpLP is ERC4626 {
         /// -----------------------------------------------------------------------
         _totalAssets += assets;
         // approve to scalp
-        asset.safeApprove(scalp, assets);
+        asset.safeApprove(address(scalp), assets);
         // deposit into scalp
-        asset.safeTransfer(scalp, assets);
+        asset.safeTransfer(address(scalp), assets);
     }
 }
