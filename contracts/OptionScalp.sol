@@ -94,27 +94,34 @@ Pausable {
     // Deposit event
     event Deposit(
         uint amount,
-        address sender
+        address indexed sender
     );
 
     // Withdraw event
     event Withdraw(
         uint amount,
-        address sender
+        address indexed sender
     );
 
     // Open position event
     event OpenPosition(
         uint id,
         uint size,
-        address user
+        address indexed user
     );
 
     // Close position event
     event ClosePosition(
         uint id,
         int pnl,
-        address user
+        address indexed user
+    );
+
+    // Liquidate position event
+    event LiquidatePosition(
+        uint id,
+        int pnl,
+        address indexed liquidator
     );
 
     constructor(
@@ -296,7 +303,29 @@ Pausable {
         uint id
     ) public {
         require(scalpPositions[id].isOpen, "Invalid position ID");
+        require(isLiquidatable(id), "Position is not in liquidation range");
 
+        // Swap back to quote asset
+        uint amountIn = scalpPositions[id].swapped;
+        uint finalSize = _swapUsingGmxExactOut(
+            base,
+            quote,
+            gmxHelper.getAmountOut(address(quote), address(base), amountIn)
+        );
+
+        int pnl = (int)(finalSize - scalpPositions[id].size);
+        scalpLp.unlockLiquidity(scalpPositions[id].size);
+        if (pnl > 0) {
+            quote.transfer(msg.sender, scalpPositions[id].margin + pnl);
+        } else {
+            if (scalpPositions[id].margin > pnl)
+                quote.transfer(msg.sender, (uint)((int)scalpPositions[id].margin + pnl));
+        }
+        emit Liquidate(
+            id,
+            pnl,
+            msg.sender
+        );
     }
 
     /// @notice Returns whether an open position is liquidatable
@@ -304,7 +333,16 @@ Pausable {
     public
     view
     returns (bool) {
-        return scalpPositions[id].swapped * getMarkPrice() 
+        uint amountIn = scalpPositions[id].swapped;
+        uint sizeAfterSwap = gmxHelper.getAmountOut(address(quote), address(base), amountIn);
+        
+        return 
+            sizeAfterSwap <= (scalpPositions[id].size - minimumAbsoluteLiquidationThreshold) ||
+            sizeAfterSwap <= 
+                (
+                    scalpPositions[id].size - 
+                    (scalpPositions[id].size * liquidationThresholdPercentage / divisor)
+                );
     }
 
     /// @notice Expires an open position post-expiry timestamp

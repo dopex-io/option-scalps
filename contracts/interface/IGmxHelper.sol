@@ -8,4 +8,10 @@ interface IGmxHelper {
         address _tokenOut,
         address _tokenIn
     ) external view returns (uint256 _amountIn);
+
+    function getAmountOut(
+        address _tokenOut,
+        address _tokenIn,
+        uint256 _amountIn
+    ) external view returns (uint256 _amountOut);
 }
