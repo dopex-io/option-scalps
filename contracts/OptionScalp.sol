@@ -89,6 +89,8 @@ Pausable {
         int pnl;
         // Opened at timestamp
         uint openedAt;
+        // How long position is to be kept open
+        uint timeframe;
     }
 
     // Deposit event
@@ -122,6 +124,13 @@ Pausable {
         uint id,
         int pnl,
         address indexed liquidator
+    );
+
+    // Expire position event
+    event ExpirePosition(
+        uint id,
+        int pnl,
+        address indexed sender
     );
 
     constructor(
@@ -253,7 +262,8 @@ Pausable {
             premium: premium,
             fees: fees,
             pnl: 0,
-            openedAt: block.timestamp
+            openedAt: block.timestamp,
+            timeframe: timeframes[timeframeIndex]
         });
 
         emit OpenPosition(
@@ -279,7 +289,7 @@ Pausable {
         uint finalSize = _swapUsingGmxExactOut(
             base,
             quote,
-            scalpPositions[id].swapped * getMarkPrice()
+            gmxHelper.getAmountOut(address(quote), address(base), amountIn)
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
@@ -305,6 +315,7 @@ Pausable {
         require(scalpPositions[id].isOpen, "Invalid position ID");
         require(isLiquidatable(id), "Position is not in liquidation range");
 
+        address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
         // Swap back to quote asset
         uint amountIn = scalpPositions[id].swapped;
         uint finalSize = _swapUsingGmxExactOut(
@@ -316,10 +327,10 @@ Pausable {
         int pnl = (int)(finalSize - scalpPositions[id].size);
         scalpLp.unlockLiquidity(scalpPositions[id].size);
         if (pnl > 0) {
-            quote.transfer(msg.sender, scalpPositions[id].margin + pnl);
+            quote.transfer(positionOwner, scalpPositions[id].margin + pnl);
         } else {
             if (scalpPositions[id].margin > pnl)
-                quote.transfer(msg.sender, (uint)((int)scalpPositions[id].margin + pnl));
+                quote.transfer(positionOwner, (uint)((int)scalpPositions[id].margin + pnl));
         }
         emit Liquidate(
             id,
@@ -350,6 +361,31 @@ Pausable {
     function expirePosition(
         uint id
     ) public {
+        require(scalpPositions[id].isOpen, "Invalid position ID");
+        require(scalpPositions[id].openedAt + timeframe >= block.timestamp, "Position has not expired");
+        require(!isLiquidatable(id), "Please call liquidate()");
+
+        address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
+        // Swap back to quote asset
+        uint finalSize = _swapUsingGmxExactOut(
+            base,
+            quote,
+            gmxHelper.getAmountOut(address(quote), address(base), amountIn)
+        );
+
+        int pnl = (int)(finalSize - scalpPositions[id].size);
+        scalpLp.unlockLiquidity(scalpPositions[id].size);
+        if (pnl > 0) {
+            quote.transfer(positionOwner, scalpPositions[id].margin + pnl);
+        } else {
+            require(scalpPositions[id].margin > pnl, "Insufficient margin");
+            quote.transfer(positionOwner, (uint)((int)scalpPositions[id].margin + pnl));
+        }
+        emit ExpirePosition(
+            id,
+            pnl,
+            msg.sender
+        );
 
     }
 
