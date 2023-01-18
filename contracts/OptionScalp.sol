@@ -53,10 +53,17 @@ Pausable {
         30 minutes
     ];
 
-    uint public minimumMargin;
+    // Minimum margin to open a position
+    uint public minimumMargin = 5e6; // $5
 
     // Fees for opening position
-    uint public feeOpenPosition  = 5000000; // 0.05%
+    uint public feeOpenPosition = 5000000; // 0.05%
+
+    // Percentage threshold above (entry - margin) when liquidate() is callable
+    uint public liquidationThresholdPercentage = 2500000; // 0.025%
+
+    // Minimum absolute threshold in quote asset above (entry - margin) when liquidate() is callable
+    uint public minimumAbsoluteLiquidationThreshold = 5e6; // $5
 
     uint public constant divisor = 1e8;
     
@@ -70,6 +77,8 @@ Pausable {
         uint size;
         // Amount of base asset swapped to
         uint swapped;
+        // Entry price
+        uint entry;
         // Margin provided
         uint margin;
         // Premium for position
@@ -98,6 +107,13 @@ Pausable {
     event OpenPosition(
         uint id,
         uint size,
+        address user
+    );
+
+    // Close position event
+    event ClosePosition(
+        uint id,
+        int pnl,
         address user
     );
 
@@ -165,8 +181,8 @@ Pausable {
     function deposit(
         uint amount
     ) public {
-        scalpLp.deposit(amount, msg.sender);
         quote.transferFrom(msg.sender, address(this), amount);
+        scalpLp.deposit(amount, msg.sender);
         emit Deposit(
             amount,
             msg.sender
@@ -189,8 +205,7 @@ Pausable {
     function openPosition(
         uint size,
         uint timeframeIndex,
-        uint margin,
-        uint minAmountOut
+        uint margin
     ) public returns (uint id) {
         require(size <= scalpLp.totalAvailableAssets(), "Not enough available liquidity");
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
@@ -218,7 +233,7 @@ Pausable {
         uint swapped = _swapUsingGmxExactOut(
             quote,
             base,
-            minAmountOut
+            size / getMarkPrice()
         );
 
         // Generate scalp position NFT
@@ -243,10 +258,36 @@ Pausable {
 
     /// @notice Closes an open position
     /// @param id Closes an open position
+    /// @param minAmountOut Minimum amount to receive when swapping back swapped assets
     function closePosition(
         uint id
     ) public {
+        require(scalpPositions[id].isOpen, "Invalid position ID");
+        require(
+            IERC721(scalpPositionMinter).ownerOf(id) == msg.sender, 
+            "Sender must be position owner"
+        );
 
+        // Swap back to quote asset
+        uint finalSize = _swapUsingGmxExactOut(
+            base,
+            quote,
+            scalpPositions[id].swapped * getMarkPrice()
+        );
+
+        int pnl = (int)(finalSize - scalpPositions[id].size);
+        scalpLp.unlockLiquidity(scalpPositions[id].size);
+        if (pnl > 0) {
+            quote.transfer(msg.sender, scalpPositions[id].margin + pnl);
+        } else {
+            require(scalpPositions[id].margin > pnl, "Insufficient margin");
+            quote.transfer(msg.sender, (uint)((int)scalpPositions[id].margin + pnl));
+        }
+        emit ClosePosition(
+            id,
+            pnl,
+            msg.sender
+        );
     }
 
     /// @notice Liquidates an undercollateralized open position
@@ -254,7 +295,32 @@ Pausable {
     function liquidate(
         uint id
     ) public {
+        require(scalpPositions[id].isOpen, "Invalid position ID");
 
+    }
+
+    /// @notice Returns whether an open position is liquidatable
+    function isLiquidatable(uint id) 
+    public
+    view
+    returns (bool) {
+        return scalpPositions[id].swapped * getMarkPrice() 
+    }
+
+    /// @notice Expires an open position post-expiry timestamp
+    /// @param id ID of position
+    function expirePosition(
+        uint id
+    ) public {
+
+    }
+
+    /// @notice Allow only scalp LP contract to claim collateral (quote assets)
+    /// @param amount Amount of quote assets to transfer
+    function claimCollateral(uint amount) 
+    public {
+        require(msg.sender == address(scalpLp), "Only Scalp LP contract can claim collateral");
+        quote.transfer(msg.sender, amount);
     }
 
     /// @notice External function to return the volatility
