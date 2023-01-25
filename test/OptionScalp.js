@@ -2,38 +2,18 @@ const { expect } = require("chai");
 const { ethers, network } = require("hardhat");
 const { BigNumber } = ethers;
 
-describe("Option Scalps", function () {
+describe("Option Perp", function() {
   let signers;
   let owner;
+
   let usdc;
   let weth;
   let priceOracle;
   let volatilityOracle;
-  let uniswapFactory;
-  let assetSwapper;
-  let uniswapV2Router;
-  let uniswapV3Router;
-  let gmxRouter;
+  let optionPricing;
   let optionScalp;
-
-  const MAX_UINT =
-    "115792089237316195423570985008687907853269984665640564039457584007913129639935";
-
-  const OPTION_PRICING = "0x2b99e3d67dad973c1b9747da742b7e26c8bdd67b";
-  const GMX_HELPER = "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
-
-  // 10th March 2022 8 AM UTC
-  const EXPIRY = 1646899200;
-
-  const toEther = (val) => BigNumber.from(10).pow(18).mul(val);
-
-  const toDecimals = (val, decimals) =>
-    BigNumber.from(10).pow(decimals).mul(val);
-
-  const timeTravel = async (seconds) => {
-    await network.provider.send("evm_increaseTime", [seconds]);
-    await network.provider.send("evm_mine", []);
-  };
+  let b50;
+  let bf5;
 
   before(async () => {
     signers = await ethers.getSigners();
@@ -43,15 +23,14 @@ describe("Option Scalps", function () {
     user0 = signers[1];
     user1 = signers[2];
     user2 = signers[3];
+    user3 = signers[4];
   });
 
-  it("should deploy option scalp", async function () {
+  it("should deploy option scalp", async function() {
     // USDC
-    const USDC = await ethers.getContractFactory("USDC");
-    usdc = await USDC.deploy();
+    usdc = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8");
     // WETH
-    const WETH = await ethers.getContractFactory("WETH");
-    weth = await WETH.deploy();
+    weth = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1");
     // Price oracle
     const PriceOracle = await ethers.getContractFactory("MockPriceOracle");
     priceOracle = await PriceOracle.deploy();
@@ -63,68 +42,47 @@ describe("Option Scalps", function () {
     // Option pricing
     const OptionPricing = await ethers.getContractFactory("MockOptionPricing");
     optionPricing = await OptionPricing.deploy();
-    // Uniswap factory
-    const UniswapFactory = await ethers.getContractFactory("UniswapV2Factory");
-    uniswapFactory = await UniswapFactory.deploy(owner.address);
 
-    // WETH-USDC pair
-    await uniswapFactory.createPair(weth.address, usdc.address);
-
-    // Uniswap v2 router
-    const UniswapV2Router = await ethers.getContractFactory(
-      "UniswapV2Router02"
-    );
-    uniswapV2Router = await UniswapV2Router.deploy(
-      uniswapFactory.address,
-      weth.address
-    );
-    // Uniswap v3 router
-    uniswapV3Router = await ethers.getContractAt(
-      "IUniswapV3Router",
-      "0xE592427A0AEce92De3Edee1F18E0157C05861564"
-    );
-    // Gmx router
-    gmxRouter = await ethers.getContractAt(
-      "IGmxRouter",
-      "0xaBBc5F99639c9B6bCb58544ddf04EFA6802F4064"
-    );
-    
-    // Asset swapper
-    const AssetSwapper = await ethers.getContractFactory("AssetSwapper");
-
-    assetSwapper = await AssetSwapper.deploy(
-      uniswapV2Router.address,
-      uniswapV3Router.address,
-      gmxRouter.address,
-      weth.address
-    );
-    // Option Scalp
-    const OptionScalp = await ethers.getContractFactory(
-      "OptionScalp"
-    );
-    // address _base,
-    // address _quote,
-    // address _optionPricing,
-    // address _volatilityOracle,
-    // address _priceOracle,
-    // address _gmxRouter,
-    // address _gmxHelper,
-    // uint _minimumMargin
+    // Option scalp
+    const OptionScalp = await ethers.getContractFactory("OptionScalp");
     optionScalp = await OptionScalp.deploy(
-        weth.address,
-        usdc.address,
-        OPTION_PRICING,
-        volatilityOracle.address,
-        priceOracle.address,
-        gmxRouter.address,
-        GMX_HELPER,
-        "10000000", // $10
+      weth.address,
+      usdc.address,
+      optionPricing.address,
+      volatilityOracle.address,
+      priceOracle.address,
+      "0xaBBc5F99639c9B6bCb58544ddf04EFA6802F4064", // GMX ROUTER
+      "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
+      "10000000", // $10
     );
 
-    const wethBalance = await weth.balanceOf(owner.address);
-    const usdcBalance = await usdc.balanceOf(owner.address);
+    console.log("deployed option scalp:", optionScalp.address);
 
-    expect(wethBalance).to.equal("100000000000000000000000000000");
-    expect(usdcBalance).to.equal("10000000000000000000");
+    // Transfer USDC and WETH to our address from another impersonated address
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: ["0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13"],
+    });
+
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: ["0x9bf54297d9270730192a83EF583fF703599D9F18"],
+    });
+
+    b50 = await ethers.provider.getSigner(
+      "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13"
+    );
+
+    bf5 = await ethers.provider.getSigner(
+      "0x9bf54297d9270730192a83EF583fF703599D9F18"
+    );
+
+    await weth.connect(b50).transfer(user1.address, ethers.utils.parseEther("200.0"));
+    await usdc.connect(bf5).transfer(user1.address, "100000000000");
+
+    await b50.sendTransaction({
+      to: user1.address,
+      value: ethers.utils.parseEther("100.0")
+    });
   });
 });
