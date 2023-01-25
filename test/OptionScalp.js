@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers, network } = require("hardhat");
 const { BigNumber } = ethers;
 
-describe("Option Perp", function() {
+describe("Option scalp", function() {
   let signers;
   let owner;
 
