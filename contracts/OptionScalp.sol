@@ -163,6 +163,7 @@ Pausable {
         scalpPositionMinter = new ScalpPositionMinter();
 
         base.approve(_gmxRouter, type(uint256).max);
+        quote.approve(_gmxRouter, type(uint256).max);
 
         scalpLp = new ScalpLP(
             address(this),
@@ -170,6 +171,7 @@ Pausable {
             base.symbol(),
             quote.symbol()
         );
+
         quote.approve(address(scalpLp), type(uint256).max);
     }
 
@@ -192,6 +194,26 @@ Pausable {
       uint amountIn = gmxHelper.getAmountIn(targetAmountOut, 0, to, from);
       gmxRouter.swap(path, amountIn, 0, address(this));
       exactAmountOut = IERC20(to).balanceOf(address(this)) - balance;
+  }
+
+  /// @notice Internal function to handle swaps using GMX
+  /// @param from Address of the token to sell
+  /// @param to Address of the token to buy
+  /// @param amountIn Amount of to token we want to sell
+  function _swapUsingGmxExactIn(
+        address from,
+        address to,
+        uint256 amountIn
+    ) internal returns (uint exactAmountOut) {
+      address[] memory path;
+
+      path = new address[](2);
+      path[0] = address(from);
+      path[1] = address(to);
+
+      uint256 startBalance = IERC20(to).balanceOf(address(this));
+      gmxRouter.swap(path, amountIn, 0, address(this));
+      exactAmountOut = IERC20(to).balanceOf(address(this)) - startBalance;
   }
 
     // Deposit quote assets to LP
@@ -248,10 +270,10 @@ Pausable {
         scalpLp.lockLiquidity(size);
 
         // Swap to base assets
-        uint swapped = _swapUsingGmxExactOut(
+        uint swapped = _swapUsingGmxExactIn(
             address(quote),
             address(base),
-            size / getMarkPrice()
+            size / 10 ** 2
         );
 
         // 1e18 / 1e6 * x = 1e8
