@@ -57,7 +57,9 @@ describe("Option scalp", function() {
     );
 
     console.log("deployed option scalp:", optionScalp.address);
+  });
 
+  it("distribute funds to user0, user1, user2 and user3", async function() {
     // Transfer USDC and WETH to our address from another impersonated address
     await network.provider.request({
       method: "hardhat_impersonateAccount",
@@ -77,12 +79,22 @@ describe("Option scalp", function() {
       "0x9bf54297d9270730192a83EF583fF703599D9F18"
     );
 
-    await weth.connect(b50).transfer(user1.address, ethers.utils.parseEther("200.0"));
-    await usdc.connect(bf5).transfer(user1.address, "100000000000");
+    [user0, user1, user2, user3].map(async user => {
+      await weth.connect(b50).transfer(user.address, ethers.utils.parseEther("10.0"));
+      await usdc.connect(bf5).transfer(user.address, "10000000000");
 
-    await b50.sendTransaction({
-      to: user1.address,
-      value: ethers.utils.parseEther("100.0")
+      await b50.sendTransaction({
+        to: user.address,
+        value: ethers.utils.parseEther("10.0")
+      });
     });
+  });
+
+  it("user 0 deposits", async function() {
+    await usdc.connect(user0).approve(optionScalp.address, "10000000000");
+
+    await expect(optionScalp.connect(user0).deposit("100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+
+    await optionScalp.connect(user0).deposit("10000000000");
   });
 });
