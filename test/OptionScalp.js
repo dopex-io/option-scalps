@@ -118,7 +118,7 @@ describe("Option scalp", function() {
     expect(quoteOut).to.eq("5000000000");
   });
 
-  it("user 1 opens a $5000 long scalp position with 200$ of margin", async function() {
+  it("user 1 opens a $5000 short scalp position with 200$ of margin", async function() {
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition("5000000000", 0, "20000000");
   });
