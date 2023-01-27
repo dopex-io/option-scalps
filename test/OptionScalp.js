@@ -122,4 +122,24 @@ describe("Option scalp", function() {
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition("5000000000", 0, "20000000");
   });
+
+  it("eth drops 10%, position is closed", async function() {
+    await priceOracle.updateUnderlyingPrice("90000000000");
+    const markPrice = await optionScalp.getMarkPrice();
+    expect(markPrice).to.eq("90000000000");
+
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+
+    expect(startQuoteBalance).to.eq('9979975000');
+
+    await optionScalp.connect(user1).closePosition(0);
+
+    const endQuoteBalance = await usdc.balanceOf(user1.address);
+
+    expect(endQuoteBalance).to.eq('14950310056');
+
+    const profit = endQuoteBalance.sub(startQuoteBalance);
+
+    expect(profit).to.eq("4970335056");
+  });
 });

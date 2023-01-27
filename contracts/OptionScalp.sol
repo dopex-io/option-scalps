@@ -313,21 +313,31 @@ Pausable {
             "Sender must be position owner"
         );
 
+        console.log('Closing...');
+
         // Swap back to quote asset
-        uint finalSize = _swapUsingGmxExactOut(
+        uint finalSize = _swapUsingGmxExactIn(
             address(base),
             address(quote),
-            gmxHelper.getAmountOut(address(quote), address(base), scalpPositions[id].swapped)
+            scalpPositions[id].swapped
         );
 
-        int pnl = (int)(finalSize - scalpPositions[id].size);
+        console.log('Swapped');
+
+        console.log('Final size');
+        console.log(finalSize);
+        console.log('Size');
+        console.log(scalpPositions[id].size);
+
+        int pnl = int(scalpPositions[id].size) - int(finalSize);
         scalpLp.unlockLiquidity(scalpPositions[id].size);
-        if (pnl > 0) {
-            quote.transfer(msg.sender, (uint)((int)(scalpPositions[id].margin) + pnl));
-        } else {
-            require((int)(scalpPositions[id].margin) > pnl, "Insufficient margin");
-            quote.transfer(msg.sender, (uint)((int)(scalpPositions[id].margin) + pnl));
-        }
+
+        require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
+
+        console.log('Sending...');
+        console.log(uint(int(scalpPositions[id].margin) + pnl));
+        quote.transfer(msg.sender, uint(int(scalpPositions[id].margin) + pnl));
+
         emit ClosePosition(
             id,
             pnl,
