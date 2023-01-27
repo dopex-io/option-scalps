@@ -136,10 +136,10 @@ describe("Option scalp", function() {
 
     const endQuoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(endQuoteBalance).to.eq('14950310056');
+    expect(endQuoteBalance).to.eq('10049478350');
 
     const profit = endQuoteBalance.sub(startQuoteBalance);
 
-    expect(profit).to.eq("4970335056");
+    expect(profit).to.eq("69503350"); // $69.50335
   });
 });

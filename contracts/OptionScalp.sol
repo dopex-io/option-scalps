@@ -329,10 +329,15 @@ Pausable {
         console.log('Size');
         console.log(scalpPositions[id].size);
 
-        int pnl = int(scalpPositions[id].size) - int(finalSize);
+        int pnl = (int(scalpPositions[id].size) - int(finalSize)) / 10 ** 2;
         scalpLp.unlockLiquidity(scalpPositions[id].size);
 
         require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
+
+        console.log('pnl');
+        console.logInt(pnl);
+        console.log('margin');
+        console.log(scalpPositions[id].margin);
 
         console.log('Sending...');
         console.log(uint(int(scalpPositions[id].margin) + pnl));
