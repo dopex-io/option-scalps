@@ -17,7 +17,7 @@ import {Pausable} from "./helpers/Pausable.sol";
 import {IOptionPricing} from "./interface/IOptionPricing.sol";
 import {IVolatilityOracle} from "./interface/IVolatilityOracle.sol";
 import {IPriceOracle} from "./interface/IPriceOracle.sol";
-import {IGmxRouter} from "./interface/IGmxRouter.sol";
+import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
 import "hardhat/console.sol";
@@ -45,10 +45,11 @@ Pausable {
     // Scalp position minter
     ScalpPositionMinter public scalpPositionMinter;
 
+    // Uniswap V3 router
+    IUniswapV3Router public uniswapV3Router;
+
     // GMX Helper
     IGmxHelper public gmxHelper;
-    // GMX Router
-    IGmxRouter public gmxRouter;
     
     uint[] public timeframes = [
         5 minutes,
@@ -146,7 +147,7 @@ Pausable {
         address _optionPricing,
         address _volatilityOracle,
         address _priceOracle,
-        address _gmxRouter,
+        address _uniswapV3Router,
         address _gmxHelper,
         uint _minimumMargin
     ) {
@@ -161,14 +162,14 @@ Pausable {
         optionPricing = IOptionPricing(_optionPricing);
         volatilityOracle = IVolatilityOracle(_volatilityOracle);
         priceOracle = IPriceOracle(_priceOracle);
+        uniswapV3Router = IUniswapV3Router(_uniswapV3Router);
         gmxHelper = IGmxHelper(_gmxHelper);
-        gmxRouter = IGmxRouter(_gmxRouter);
         minimumMargin = _minimumMargin;
 
         scalpPositionMinter = new ScalpPositionMinter();
 
-        base.approve(_gmxRouter, type(uint256).max);
-        quote.approve(_gmxRouter, type(uint256).max);
+        base.approve(address(uniswapV3Router), type(uint256).max);
+        quote.approve(address(uniswapV3Router), type(uint256).max);
 
         quoteLp = new ScalpLP(
             address(this),
@@ -188,46 +189,47 @@ Pausable {
         base.approve(address(baseLp), type(uint256).max);
     }
 
-  /// @notice Internal function to handle swaps using GMX
-  /// @param from Address of the token to sell
-  /// @param to Address of the token to buy
-  /// @param targetAmountOut Target amount of to token we want to receive
-  function _swapUsingGmxExactOut(
+    /// @notice Internal function to handle swaps using Uniswap V3 exactOutput
+    /// @param from Address of the token to sell
+    /// @param to Address of the token to buy
+    /// @param amountOut Target amount of to token we want to receive
+    function _swapExactOut(
         address from,
         address to,
-        uint256 targetAmountOut
-    ) internal returns (uint exactAmountOut) {
-      address[] memory path;
+        uint256 amountOut
+    ) internal returns (uint256 amountIn) {
+      return uniswapV3Router.exactOutputSingle(IUniswapV3Router.ExactOutputSingleParams({
+            tokenIn: from,
+            tokenOut: to,
+            fee: 500,
+            recipient: address(this),
+            deadline: block.timestamp,
+            amountOut: amountOut,
+            amountInMaximum: type(uint256).max,
+            sqrtPriceLimitX96: 0
+      }));
+    }
 
-      path = new address[](2);
-      path[0] = address(from);
-      path[1] = address(to);
-
-      uint balance = IERC20(to).balanceOf(address(this));
-      uint amountIn = gmxHelper.getAmountIn(targetAmountOut, 0, to, from);
-      gmxRouter.swap(path, amountIn, 0, address(this));
-      exactAmountOut = IERC20(to).balanceOf(address(this)) - balance;
-  }
-
-  /// @notice Internal function to handle swaps using GMX
-  /// @param from Address of the token to sell
-  /// @param to Address of the token to buy
-  /// @param amountIn Amount of to token we want to sell
-  function _swapUsingGmxExactIn(
+    /// @notice Internal function to handle swaps using Uniswap V3 exactIn
+    /// @param from Address of the token to sell
+    /// @param to Address of the token to buy
+    /// @param amountOut Target amount of to token we want to receive
+    function _swapExactIn(
         address from,
         address to,
         uint256 amountIn
-    ) internal returns (uint exactAmountOut) {
-      address[] memory path;
-
-      path = new address[](2);
-      path[0] = address(from);
-      path[1] = address(to);
-
-      uint256 startBalance = IERC20(to).balanceOf(address(this));
-      gmxRouter.swap(path, amountIn, 0, address(this));
-      exactAmountOut = IERC20(to).balanceOf(address(this)) - startBalance;
-  }
+    ) internal returns (uint256 amountOut) {
+      return uniswapV3Router.exactInputSingle(IUniswapV3Router.ExactInputSingleParams({
+            tokenIn: from,
+            tokenOut: to,
+            fee: 500,
+            recipient: address(this),
+            deadline: block.timestamp,
+            amountIn: amountIn,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+      }));
+    }
 
     // Deposit assets
     // @param isQuote If true user deposits quote token (else base)
@@ -272,6 +274,7 @@ Pausable {
     }
 
     /// @notice Opens a position against/in favour of the base asset
+    /// If you short base is swapped to quote
     function openPosition(
         bool isShort,
         uint size,
@@ -302,7 +305,7 @@ Pausable {
         quoteLp.lockLiquidity(size);
 
         // Swap to base assets
-        uint swapped = _swapUsingGmxExactIn(
+        uint swapped = _swapExactIn(
             address(quote),
             address(base),
             size / 10 ** 2
@@ -349,7 +352,7 @@ Pausable {
         console.log('Closing...');
 
         // Swap back to quote asset
-        uint finalSize = _swapUsingGmxExactIn(
+        uint finalSize = _swapExactIn(
             address(base),
             address(quote),
             scalpPositions[id].swapped
@@ -394,10 +397,10 @@ Pausable {
         address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
         // Swap back to quote asset
         uint amountIn = scalpPositions[id].swapped;
-        uint finalSize = _swapUsingGmxExactOut(
+        uint finalSize = _swapExactOut(
             address(base),
             address(quote),
-            gmxHelper.getAmountOut(address(quote), address(base), amountIn)
+            amountIn
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
@@ -443,10 +446,10 @@ Pausable {
 
         address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
         // Swap back to quote asset
-        uint finalSize = _swapUsingGmxExactOut(
+        uint finalSize = _swapExactOut(
             address(base),
             address(quote),
-            gmxHelper.getAmountOut(address(quote), address(base), scalpPositions[id].swapped)
+            scalpPositions[id].swapped
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);

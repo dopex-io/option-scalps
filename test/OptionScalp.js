@@ -53,7 +53,7 @@ describe("Option scalp", function() {
       optionPricing.address,
       volatilityOracle.address,
       priceOracle.address,
-      "0xaBBc5F99639c9B6bCb58544ddf04EFA6802F4064", // GMX ROUTER
+      "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
       "10000000", // $10
     );
@@ -137,10 +137,10 @@ describe("Option scalp", function() {
 
     const endQuoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(endQuoteBalance).to.eq('10049478350');
+    expect(endQuoteBalance).to.eq('10049475499');
 
     const profit = endQuoteBalance.sub(startQuoteBalance);
 
-    expect(profit).to.eq("69503350"); // $69.50335
+    expect(profit).to.eq("69500499"); // $69.50
   });
 });
