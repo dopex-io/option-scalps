@@ -94,10 +94,12 @@ describe("Option scalp", function() {
 
   it("user 0 deposits", async function() {
     await usdc.connect(user0).approve(optionScalp.address, "10000000000");
+    await weth.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("10.0"));
 
     await expect(optionScalp.connect(user0).deposit(true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
     await optionScalp.connect(user0).deposit(true, "10000000000");
+    await optionScalp.connect(user0).deposit(false, ethers.utils.parseEther("10.0"));
   });
 
   it("user 0 withdraws half", async function() {
@@ -137,10 +139,10 @@ describe("Option scalp", function() {
 
     const endQuoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(endQuoteBalance).to.eq('10049475499');
+    expect(endQuoteBalance).to.eq('10099975000');
 
     const profit = endQuoteBalance.sub(startQuoteBalance);
 
-    expect(profit).to.eq("69500499"); // $69.50
+    expect(profit).to.eq("120000000"); // $120
   });
 });

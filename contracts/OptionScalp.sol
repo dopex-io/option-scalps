@@ -81,8 +81,8 @@ Pausable {
         bool isShort;
         // Total size in quote asset
         uint size;
-        // Amount of base asset swapped to
-        uint swapped;
+        // Amount received from swap
+        uint amountOut;
         // Entry price
         uint entry;
         // Margin provided
@@ -197,7 +197,7 @@ Pausable {
         address from,
         address to,
         uint256 amountOut
-    ) internal returns (uint256 amountIn) {
+    ) internal returns (uint amountIn) {
       return uniswapV3Router.exactOutputSingle(IUniswapV3Router.ExactOutputSingleParams({
             tokenIn: from,
             tokenOut: to,
@@ -218,7 +218,7 @@ Pausable {
         address from,
         address to,
         uint256 amountIn
-    ) internal returns (uint256 amountOut) {
+    ) internal returns (uint amountOut) {
       return uniswapV3Router.exactInputSingle(IUniswapV3Router.ExactInputSingleParams({
             tokenIn: from,
             tokenOut: to,
@@ -281,8 +281,6 @@ Pausable {
         uint timeframeIndex,
         uint margin
     ) public returns (uint id) {
-        if (isShort) require(size <= quoteLp.totalAvailableAssets(), "Not enough available liquidity");
-        else if (isShort) require(size <= baseLp.totalAvailableAssets(), "Not enough available liquidity");
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
 
@@ -295,34 +293,51 @@ Pausable {
         // Total fees in quote
         uint totalFee = premium + openingFees;
 
+        uint swapped;
+
+        if (isShort) {
+            // base to quote
+            swapped = _swapExactOut(
+                address(base),
+                address(quote),
+                size / 10 ** 2
+            );
+
+            baseLp.lockLiquidity(swapped);
+        } else {
+            // quote to base
+            swapped = _swapExactIn(
+                address(quote),
+                address(base),
+                size / 10 ** 2
+            );
+
+            quoteLp.lockLiquidity(size / 10 ** 2);
+        }
+
         // Transfer fees + margin
         quote.transferFrom(msg.sender, address(this), (totalFee + margin));
 
         // Transfer fees to LP
-        quoteLp.addProceeds(totalFee);
+        if (isShort) {
+            uint proceeds = _swapExactIn(
+                address(quote),
+                address(base),
+                (totalFee + margin)
+            );
+            baseLp.addProceeds(proceeds);
+        } else {
+            quoteLp.addProceeds(totalFee + margin);
+        }
 
-        // Lock `size` liquidity
-        quoteLp.lockLiquidity(size);
-
-        // Swap to base assets
-        uint swapped = _swapExactIn(
-            address(quote),
-            address(base),
-            size / 10 ** 2
-        );
-
-        // 1e18 / 1e6 * x = 1e8
-        // 1e8 * 1e6 / 1e18
-
-        uint entry = swapped / size *  (base.decimals() / (divisor * quote.decimals()));
         // Generate scalp position NFT
         id = scalpPositionMinter.mint(msg.sender);
         scalpPositions[id] = ScalpPosition({
             isOpen: true,
             isShort: isShort,
             size: size,
-            swapped: swapped,
-            entry: entry,
+            amountOut: isShort ? size / 10 ** 2 : swapped,
+            entry: getMarkPrice(),
             margin: margin,
             premium: premium,
             fees: openingFees,
@@ -351,32 +366,41 @@ Pausable {
 
         console.log('Closing...');
 
-        // Swap back to quote asset
-        uint finalSize = _swapExactIn(
-            address(base),
-            address(quote),
-            scalpPositions[id].swapped
-        );
+        uint swapped;
+        int pnl;
 
-        console.log('Swapped');
+        if (scalpPositions[id].isShort) {
+            // quote to base
+            swapped = _swapExactIn(
+                address(quote),
+                address(base),
+                scalpPositions[id].amountOut
+            );
 
-        console.log('Final size');
-        console.log(finalSize);
-        console.log('Size');
-        console.log(scalpPositions[id].size);
+            pnl = (int(scalpPositions[id].entry) - int(getMarkPrice())) / 10 ** 2;
+            baseLp.unlockLiquidity(swapped);
 
-        int pnl = (int(scalpPositions[id].size) - int(finalSize)) / 10 ** 2;
-        quoteLp.unlockLiquidity(scalpPositions[id].size);
+            require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
 
-        require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
+            _swapExactOut(
+                address(base),
+                address(quote),
+                uint(int(scalpPositions[id].margin) + pnl)
+            );
+        } else {
+            // base to quote
+            swapped = _swapExactIn(
+                address(base),
+                address(quote),
+                scalpPositions[id].amountOut
+            );
 
-        console.log('pnl');
-        console.logInt(pnl);
-        console.log('margin');
-        console.log(scalpPositions[id].margin);
+            pnl = (int(getMarkPrice()) - int(scalpPositions[id].entry)) / 10 ** 2;
+            quoteLp.unlockLiquidity(swapped);
 
-        console.log('Sending...');
-        console.log(uint(int(scalpPositions[id].margin) + pnl));
+            require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
+        }
+
         quote.transfer(msg.sender, uint(int(scalpPositions[id].margin) + pnl));
 
         emit ClosePosition(
@@ -396,7 +420,7 @@ Pausable {
 
         address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
         // Swap back to quote asset
-        uint amountIn = scalpPositions[id].swapped;
+        uint amountIn = scalpPositions[id].amountOut;
         uint finalSize = _swapExactOut(
             address(base),
             address(quote),
@@ -423,7 +447,7 @@ Pausable {
     public
     view
     returns (bool) {
-        uint amountIn = scalpPositions[id].swapped;
+        uint amountIn = scalpPositions[id].amountOut;
         uint sizeAfterSwap = gmxHelper.getAmountOut(address(quote), address(base), amountIn);
         
         return 
@@ -449,7 +473,7 @@ Pausable {
         uint finalSize = _swapExactOut(
             address(base),
             address(quote),
-            scalpPositions[id].swapped
+            scalpPositions[id].amountOut
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
