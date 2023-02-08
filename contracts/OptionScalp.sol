@@ -25,15 +25,16 @@ import "hardhat/console.sol";
 contract OptionScalp is
 Ownable,
 Pausable {
-
     using SafeERC20 for IERC20;
 
     // Base token
     IERC20 public base;
     // Quote token
     IERC20 public quote;
-    // Scalp LP token
-    ScalpLP public scalpLp;
+    // Scalp Base LP token
+    ScalpLP public baseLp;
+    // Scalp Quotee LP token
+    ScalpLP public quoteLp;
 
     // Option pricing
     IOptionPricing public optionPricing;
@@ -75,6 +76,8 @@ Pausable {
     struct ScalpPosition {
         // Is position open
         bool isOpen;
+        // Is short
+        bool isShort;
         // Total size in quote asset
         uint size;
         // Amount of base asset swapped to
@@ -97,12 +100,14 @@ Pausable {
 
     // Deposit event
     event Deposit(
+        bool isQuote,
         uint amount,
         address indexed sender
     );
 
     // Withdraw event
     event Withdraw(
+        bool isQuote,
         uint amount,
         address indexed sender
     );
@@ -165,14 +170,22 @@ Pausable {
         base.approve(_gmxRouter, type(uint256).max);
         quote.approve(_gmxRouter, type(uint256).max);
 
-        scalpLp = new ScalpLP(
+        quoteLp = new ScalpLP(
             address(this),
             address(quote),
             base.symbol(),
             quote.symbol()
         );
 
-        quote.approve(address(scalpLp), type(uint256).max);
+        baseLp = new ScalpLP(
+            address(this),
+            address(base),
+            base.symbol(),
+            quote.symbol()
+        );
+
+        quote.approve(address(quoteLp), type(uint256).max);
+        base.approve(address(baseLp), type(uint256).max);
     }
 
   /// @notice Internal function to handle swaps using GMX
@@ -216,38 +229,57 @@ Pausable {
       exactAmountOut = IERC20(to).balanceOf(address(this)) - startBalance;
   }
 
-    // Deposit quote assets to LP
+    // Deposit assets
+    // @param isQuote If true user deposits quote token (else base)
     // @param amount Amount of quote asset to deposit to LP
     function deposit(
+        bool isQuote,
         uint amount
     ) public {
-        quote.transferFrom(msg.sender, address(this), amount);
-        scalpLp.deposit(amount, msg.sender);
+        if (isQuote) {
+            quote.transferFrom(msg.sender, address(this), amount);
+            quoteLp.deposit(amount, msg.sender);
+        } else {
+            base.transferFrom(msg.sender, address(this), amount);
+            baseLp.deposit(amount, msg.sender);
+        }
+
         emit Deposit(
+            isQuote,
             amount,
             msg.sender
         );
     }
 
-    // Withdraw LP position
+    // Withdraw
+    // @param isQuote If true user withdraws quote token (else base)
     // @param amount Amount of LP positions to withdraw
     function withdraw(
+        bool isQuote,
         uint amount
     ) public {
-        scalpLp.redeem(amount, msg.sender, msg.sender);
+        if (isQuote) {
+            quoteLp.redeem(amount, msg.sender, msg.sender);
+        } else {
+            baseLp.redeem(amount, msg.sender, msg.sender);
+        }
+
         emit Withdraw(
+            isQuote,
             amount,
             msg.sender
         );
     }
 
-    /// @notice Opens a position against the base asset
+    /// @notice Opens a position against/in favour of the base asset
     function openPosition(
+        bool isShort,
         uint size,
         uint timeframeIndex,
         uint margin
     ) public returns (uint id) {
-        require(size <= scalpLp.totalAvailableAssets(), "Not enough available liquidity");
+        if (isShort) require(size <= quoteLp.totalAvailableAssets(), "Not enough available liquidity");
+        else if (isShort) require(size <= baseLp.totalAvailableAssets(), "Not enough available liquidity");
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
 
@@ -264,10 +296,10 @@ Pausable {
         quote.transferFrom(msg.sender, address(this), (totalFee + margin));
 
         // Transfer fees to LP
-        scalpLp.addProceeds(totalFee);
+        quoteLp.addProceeds(totalFee);
 
         // Lock `size` liquidity
-        scalpLp.lockLiquidity(size);
+        quoteLp.lockLiquidity(size);
 
         // Swap to base assets
         uint swapped = _swapUsingGmxExactIn(
@@ -284,6 +316,7 @@ Pausable {
         id = scalpPositionMinter.mint(msg.sender);
         scalpPositions[id] = ScalpPosition({
             isOpen: true,
+            isShort: isShort,
             size: size,
             swapped: swapped,
             entry: entry,
@@ -330,7 +363,7 @@ Pausable {
         console.log(scalpPositions[id].size);
 
         int pnl = (int(scalpPositions[id].size) - int(finalSize)) / 10 ** 2;
-        scalpLp.unlockLiquidity(scalpPositions[id].size);
+        quoteLp.unlockLiquidity(scalpPositions[id].size);
 
         require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
 
@@ -368,7 +401,7 @@ Pausable {
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
-        scalpLp.unlockLiquidity(scalpPositions[id].size);
+        quoteLp.unlockLiquidity(scalpPositions[id].size);
         if (pnl > 0) {
             quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
         } else {
@@ -417,7 +450,7 @@ Pausable {
         );
 
         int pnl = (int)(finalSize - scalpPositions[id].size);
-        scalpLp.unlockLiquidity(scalpPositions[id].size);
+        quoteLp.unlockLiquidity(scalpPositions[id].size);
         if (pnl > 0) {
             quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
         } else {
@@ -432,12 +465,13 @@ Pausable {
 
     }
 
-    /// @notice Allow only scalp LP contract to claim collateral (quote assets)
-    /// @param amount Amount of quote assets to transfer
-    function claimCollateral(uint amount) 
+    /// @notice Allow only scalp LP contract to claim collateral
+    /// @param amount Amount of quote/base assets to transfer
+    function claimCollateral(uint amount)
     public {
-        require(msg.sender == address(scalpLp), "Only Scalp LP contract can claim collateral");
-        quote.transfer(msg.sender, amount);
+        require(msg.sender == address(quoteLp) || msg.sender == address(baseLp), "Only Scalp LP contract can claim collateral");
+        if (msg.sender == address(quoteLp)) quote.transfer(msg.sender, amount);
+        else if (msg.sender == address(baseLp)) base.transfer(msg.sender, amount);
     }
 
     /// @notice External function to return the volatility

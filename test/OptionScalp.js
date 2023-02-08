@@ -8,7 +8,8 @@ describe("Option scalp", function() {
 
   let usdc;
   let weth;
-  let scalpLp;
+  let quoteLp;
+  let baseLp;
   let priceOracle;
   let volatilityOracle;
   let optionPricing;
@@ -94,24 +95,24 @@ describe("Option scalp", function() {
   it("user 0 deposits", async function() {
     await usdc.connect(user0).approve(optionScalp.address, "10000000000");
 
-    await expect(optionScalp.connect(user0).deposit("100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    await expect(optionScalp.connect(user0).deposit(true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
-    await optionScalp.connect(user0).deposit("10000000000");
+    await optionScalp.connect(user0).deposit(true, "10000000000");
   });
 
   it("user 0 withdraws half", async function() {
-    const scalpLpAddress = await optionScalp.connect(user0).scalpLp();
-    scalpLp = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", scalpLpAddress);
-    const balance = await scalpLp.balanceOf(user0.address);
+    const scalpLpAddress = await optionScalp.connect(user0).quoteLp();
+    quoteLp = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", scalpLpAddress);
+    const balance = await quoteLp.balanceOf(user0.address);
     expect(balance).to.eq("10000000000");
 
     // Allowance is required
-    await scalpLp.connect(user0).approve(optionScalp.address, "1000000000000000000000000000000000");
+    await quoteLp.connect(user0).approve(optionScalp.address, "1000000000000000000000000000000000");
 
-    await expect(optionScalp.connect(user0).withdraw("10000000000000")).to.be.revertedWith('Not enough available assets to satisfy withdrawal');
+    await expect(optionScalp.connect(user0).withdraw(true, "10000000000000")).to.be.revertedWith('Not enough available assets to satisfy withdrawal');
 
     const startQuoteBalance = await usdc.balanceOf(user0.address);
-    await optionScalp.connect(user0).withdraw(balance.div(2));
+    await optionScalp.connect(user0).withdraw(true, balance.div(2));
     const endQuoteBalance = await usdc.balanceOf(user0.address);
 
     const quoteOut = endQuoteBalance.sub(startQuoteBalance);
@@ -120,7 +121,7 @@ describe("Option scalp", function() {
 
   it("user 1 opens a $5000 short scalp position with 200$ of margin", async function() {
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition("5000000000", 0, "20000000");
+    await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "20000000");
   });
 
   it("eth drops 10%, position is closed", async function() {
