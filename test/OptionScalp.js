@@ -56,6 +56,7 @@ describe("Option scalp", function() {
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
       "10000000", // $10
+       "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13" // Insurace fund
     );
 
     console.log("deployed option scalp:", optionScalp.address);
