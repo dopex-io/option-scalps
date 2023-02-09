@@ -447,16 +447,11 @@ Pausable {
     public
     view
     returns (bool) {
-        uint amountIn = scalpPositions[id].amountOut;
-        uint sizeAfterSwap = gmxHelper.getAmountOut(address(quote), address(base), amountIn);
-        
-        return 
-            sizeAfterSwap <= (scalpPositions[id].size - minimumAbsoluteLiquidationThreshold) ||
-            sizeAfterSwap <= 
-                (
-                    scalpPositions[id].size - 
-                    (scalpPositions[id].size * liquidationThresholdPercentage / divisor)
-                );
+        int pnl;
+        if (scalpPositions[id].isShort) pnl = (int(scalpPositions[id].entry) - int(getMarkPrice())) / 10 ** 2;
+        else pnl = (int(getMarkPrice()) - int(scalpPositions[id].entry)) / 10 ** 2;
+
+        return int(scalpPositions[id].margin) + pnl < int(minimumAbsoluteLiquidationThreshold);
     }
 
     /// @notice Expires an open position post-expiry timestamp
