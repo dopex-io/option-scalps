@@ -360,8 +360,8 @@ Pausable {
     ) public {
         require(scalpPositions[id].isOpen, "Invalid position ID");
         require(
-            IERC721(scalpPositionMinter).ownerOf(id) == msg.sender, 
-            "Sender must be position owner"
+            IERC721(scalpPositionMinter).ownerOf(id) == msg.sender || scalpPositions[id].openedAt + scalpPositions[id].timeframe >= block.timestamp,
+            "Sender must be position owner or position must be expired"
         );
 
         console.log('Closing...');
@@ -401,7 +401,7 @@ Pausable {
             require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
         }
 
-        quote.transfer(msg.sender, uint(int(scalpPositions[id].margin) + pnl));
+        quote.transfer(IERC721(scalpPositionMinter).ownerOf(id), uint(int(scalpPositions[id].margin) + pnl));
 
         emit ClosePosition(
             id,
@@ -452,39 +452,6 @@ Pausable {
         else pnl = (int(getMarkPrice()) - int(scalpPositions[id].entry)) / 10 ** 2;
 
         return int(scalpPositions[id].margin) + pnl < int(minimumAbsoluteLiquidationThreshold);
-    }
-
-    /// @notice Expires an open position post-expiry timestamp
-    /// @param id ID of position
-    function expirePosition(
-        uint id
-    ) public {
-        require(scalpPositions[id].isOpen, "Invalid position ID");
-        require(scalpPositions[id].openedAt + scalpPositions[id].timeframe >= block.timestamp, "Position has not expired");
-        require(!isLiquidatable(id), "Please call liquidate()");
-
-        address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
-        // Swap back to quote asset
-        uint finalSize = _swapExactOut(
-            address(base),
-            address(quote),
-            scalpPositions[id].amountOut
-        );
-
-        int pnl = (int)(finalSize - scalpPositions[id].size);
-        quoteLp.unlockLiquidity(scalpPositions[id].size);
-        if (pnl > 0) {
-            quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
-        } else {
-            require((int)(scalpPositions[id].margin) > pnl, "Insufficient margin");
-            quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
-        }
-        emit ExpirePosition(
-            id,
-            pnl,
-            msg.sender
-        );
-
     }
 
     /// @notice Allow only scalp LP contract to claim collateral
