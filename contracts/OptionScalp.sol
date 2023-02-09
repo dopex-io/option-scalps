@@ -57,6 +57,9 @@ Pausable {
         30 minutes
     ];
 
+    // Address of multisig which handles insurance fund
+    address public insuranceFund;
+
     // Minimum margin to open a position
     uint public minimumMargin = 5e6; // $5
 
@@ -149,13 +152,15 @@ Pausable {
         address _priceOracle,
         address _uniswapV3Router,
         address _gmxHelper,
-        uint _minimumMargin
+        uint _minimumMargin,
+        address _insuranceFund
     ) {
         require(_base != address(0), "Invalid base token");
         require(_quote != address(0), "Invalid quote token");
         require(_optionPricing != address(0), "Invalid option pricing");
         require(_volatilityOracle != address(0), "Invalid volatility oracle");
         require(_priceOracle != address(0), "Invalid price oracle");
+        require(_insuranceFund != address(0), "Invalid insurance fund");
 
         base = IERC20(_base);
         quote = IERC20(_quote);
@@ -165,6 +170,7 @@ Pausable {
         uniswapV3Router = IUniswapV3Router(_uniswapV3Router);
         gmxHelper = IGmxHelper(_gmxHelper);
         minimumMargin = _minimumMargin;
+        insuranceFund = _insuranceFund;
 
         scalpPositionMinter = new ScalpPositionMinter();
 
@@ -410,7 +416,7 @@ Pausable {
         );
     }
 
-    /// @notice Liquidates an undercollateralized open position
+    /// @notice Liquidates an underCollateralized open position, all funds go to LPs
     /// @param id ID of position
     function liquidate(
         uint id
@@ -419,22 +425,46 @@ Pausable {
         require(isLiquidatable(id), "Position is not in liquidation range");
 
         address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
-        // Swap back to quote asset
-        uint amountIn = scalpPositions[id].amountOut;
-        uint finalSize = _swapExactOut(
-            address(base),
-            address(quote),
-            amountIn
-        );
 
-        int pnl = (int)(finalSize - scalpPositions[id].size);
-        quoteLp.unlockLiquidity(scalpPositions[id].size);
-        if (pnl > 0) {
-            quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
+        uint amountToAddInsuranceFund;
+        int pnl;
+        uint swapped;
+
+        if (scalpPositions[id].isShort) {
+            // quote to base
+            swapped = _swapExactIn(
+                address(quote),
+                address(base),
+                scalpPositions[id].amountOut
+            );
+
+            pnl = (int(scalpPositions[id].entry) - int(getMarkPrice())) / 10 ** 2;
+            baseLp.unlockLiquidity(swapped);
+
+            if (int(scalpPositions[id].margin) + pnl > 0) {
+                 amountToAddInsuranceFund = uint(int(scalpPositions[id].margin) + pnl);
+                 _swapExactOut(
+                    address(base),
+                    address(quote),
+                    amountToAddInsuranceFund
+                );
+            }
         } else {
-            if ((int)(scalpPositions[id].margin) > pnl)
-                quote.transfer(positionOwner, (uint)((int)(scalpPositions[id].margin) + pnl));
+            // base to quote
+            swapped = _swapExactIn(
+                address(base),
+                address(quote),
+                scalpPositions[id].amountOut
+            );
+
+            quoteLp.unlockLiquidity(swapped);
+
+            pnl = (int(getMarkPrice()) - int(scalpPositions[id].entry)) / 10 ** 2;
+            if (int(scalpPositions[id].margin) + pnl > 0) amountToAddInsuranceFund = uint(int(scalpPositions[id].margin) + pnl);
         }
+
+        if (amountToAddInsuranceFund > 0) quoteLp.deposit(amountToAddInsuranceFund, insuranceFund);
+
         emit LiquidatePosition(
             id,
             pnl,
