@@ -84,6 +84,8 @@ Pausable {
         bool isShort;
         // Total size in quote asset
         uint size;
+        // Open position count (in base asset)
+        uint positions;
         // Amount received from swap
         uint amountOut;
         // Entry price
@@ -290,8 +292,10 @@ Pausable {
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
 
+        uint markPrice = getMarkPrice();
+
         // Calculate premium for ATM option in quote
-        uint premium = calcPremium(getMarkPrice(), size, timeframes[timeframeIndex]);
+        uint premium = calcPremium(markPrice, size, timeframes[timeframeIndex]);
 
         // Calculate opening fees in quote
         uint openingFees = calcFees(size / 10 ** 2);
@@ -342,6 +346,7 @@ Pausable {
             isOpen: true,
             isShort: isShort,
             size: size,
+            positions: size * divisor / markPrice,
             amountOut: isShort ? size / 10 ** 2 : swapped,
             entry: getMarkPrice(),
             margin: margin,
@@ -360,7 +365,7 @@ Pausable {
     }
 
     /// @notice Closes an open position
-    /// @param id Closes an open position
+    /// @param id ID of position
     function closePosition(
         uint id
     ) public {
@@ -373,7 +378,7 @@ Pausable {
         console.log('Closing...');
 
         uint swapped;
-        int pnl;
+        int pnl = calcPnl(id);
 
         if (scalpPositions[id].isShort) {
             // quote to base
@@ -383,10 +388,12 @@ Pausable {
                 scalpPositions[id].amountOut
             );
 
-            pnl = (int(scalpPositions[id].entry) - int(getMarkPrice())) / 10 ** 2;
             baseLp.unlockLiquidity(swapped);
 
-            require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
+            require(
+                int(scalpPositions[id].margin) + pnl - int(scalpPositions[id].premium) - int(scalpPositions[id].fees) > 0,
+                "Insufficient margin to cover negative PnL, premium and fees"
+            );
 
             _swapExactOut(
                 address(base),
@@ -401,7 +408,6 @@ Pausable {
                 scalpPositions[id].amountOut
             );
 
-            pnl = (int(getMarkPrice()) - int(scalpPositions[id].entry)) / 10 ** 2;
             quoteLp.unlockLiquidity(swapped);
 
             require(int(scalpPositions[id].margin) + pnl > 0, "Insufficient margin to cover negative PnL");
@@ -426,8 +432,9 @@ Pausable {
 
         address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
 
+        int pnl = calcPnl(id);
+
         uint amountToAddInsuranceFund;
-        int pnl;
         uint swapped;
 
         if (scalpPositions[id].isShort) {
@@ -438,7 +445,6 @@ Pausable {
                 scalpPositions[id].amountOut
             );
 
-            pnl = (int(scalpPositions[id].entry) - int(getMarkPrice())) / 10 ** 2;
             baseLp.unlockLiquidity(swapped);
 
             if (int(scalpPositions[id].margin) + pnl > 0) {
@@ -459,7 +465,6 @@ Pausable {
 
             quoteLp.unlockLiquidity(swapped);
 
-            pnl = (int(getMarkPrice()) - int(scalpPositions[id].entry)) / 10 ** 2;
             if (int(scalpPositions[id].margin) + pnl > 0) amountToAddInsuranceFund = uint(int(scalpPositions[id].margin) + pnl);
         }
 
@@ -477,11 +482,8 @@ Pausable {
     public
     view
     returns (bool) {
-        int pnl;
-        if (scalpPositions[id].isShort) pnl = (int(scalpPositions[id].entry) - int(getMarkPrice())) / 10 ** 2;
-        else pnl = (int(getMarkPrice()) - int(scalpPositions[id].entry)) / 10 ** 2;
-
-        return int(scalpPositions[id].margin) + pnl < int(minimumAbsoluteLiquidationThreshold);
+        return int(scalpPositions[id].margin) + calcPnl(id) - int(scalpPositions[id].premium) - int(scalpPositions[id].fees)
+        < int(minimumAbsoluteLiquidationThreshold) * int(scalpPositions[id].positions);
     }
 
     /// @notice Allow only scalp LP contract to claim collateral
@@ -536,6 +538,19 @@ Pausable {
     view
     returns (uint fees) {
         fees = (amount * feeOpenPosition) / (100 * divisor);
+    }
+
+    /// @notice Internal function to calculate pnl
+    /// @param id ID of position
+    function calcPnl(
+        uint id
+    )
+    internal
+    view
+    returns (int pnl) {
+        uint markPrice = getMarkPrice();
+        if (scalpPositions[id].isShort) pnl = (int(scalpPositions[id].entry) - int(markPrice)) / 10 ** 2;
+        else pnl = (int(markPrice) - int(scalpPositions[id].entry)) / 10 ** 2;
     }
 
     /// @notice Public function to retrieve price of base asset from oracle
