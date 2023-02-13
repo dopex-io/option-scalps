@@ -300,9 +300,6 @@ Pausable {
         // Calculate opening fees in quote
         uint openingFees = calcFees(size / 10 ** 2);
 
-        // Total fees in quote
-        uint totalFee = premium + openingFees;
-
         uint swapped;
 
         if (isShort) {
@@ -325,19 +322,22 @@ Pausable {
             quoteLp.lockLiquidity(size / 10 ** 2);
         }
 
-        // Transfer fees + margin
-        quote.transferFrom(msg.sender, address(this), (totalFee + margin));
-
-        // Transfer fees to LP
+        // Transfer fees to Insurance fund
         if (isShort) {
             uint proceeds = _swapExactIn(
                 address(quote),
                 address(base),
-                (totalFee + margin)
+                (premium + openingFees)
             );
-            baseLp.addProceeds(proceeds);
+            baseLp.deposit(proceeds, insuranceFund);
+
+            _swapExactIn(
+                address(quote),
+                address(base),
+                margin
+            );
         } else {
-            quoteLp.addProceeds(totalFee + margin);
+            quoteLp.deposit(premium + openingFees, insuranceFund);
         }
 
         // Generate scalp position NFT
