@@ -182,15 +182,13 @@ Pausable {
         quoteLp = new ScalpLP(
             address(this),
             address(quote),
-            base.symbol(),
             quote.symbol()
         );
 
         baseLp = new ScalpLP(
             address(this),
             address(base),
-            base.symbol(),
-            quote.symbol()
+            base.symbol()
         );
 
         quote.approve(address(quoteLp), type(uint256).max);
@@ -374,8 +372,6 @@ Pausable {
             IERC721(scalpPositionMinter).ownerOf(id) == msg.sender || scalpPositions[id].openedAt + scalpPositions[id].timeframe >= block.timestamp,
             "Sender must be position owner or position must be expired"
         );
-
-        console.log('Closing...');
 
         uint swapped;
         int pnl = calcPnl(id);
