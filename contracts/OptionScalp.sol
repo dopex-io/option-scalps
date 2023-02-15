@@ -322,20 +322,14 @@ Pausable {
 
         // Transfer fees to Insurance fund
         if (isShort) {
-            uint proceeds = _swapExactIn(
+            uint baseOpeningFees = _swapExactIn(
                 address(quote),
                 address(base),
-                (premium + openingFees)
+                openingFees
             );
-            baseLp.deposit(proceeds, insuranceFund);
-
-            _swapExactIn(
-                address(quote),
-                address(base),
-                margin
-            );
+            baseLp.deposit(baseOpeningFees, insuranceFund);
         } else {
-            quoteLp.deposit(premium + openingFees, insuranceFund);
+            quoteLp.deposit(openingFees, insuranceFund);
         }
 
         // Generate scalp position NFT
