@@ -328,8 +328,17 @@ Pausable {
                 openingFees
             );
             baseLp.deposit(baseOpeningFees, insuranceFund);
+
+            uint basePremium = _swapExactIn(
+                address(quote),
+                address(base),
+                premium
+            );
+
+            baseLp.addProceeds(basePremium);
         } else {
             quoteLp.deposit(openingFees, insuranceFund);
+            quoteLp.addProceeds(premium);
         }
 
         // Generate scalp position NFT
