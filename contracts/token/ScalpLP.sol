@@ -92,6 +92,12 @@ contract ScalpLP is ERC4626 {
         _totalAssets += proceeds;
     }
 
+    // Subtract loss from total available assets
+    function subtractLoss(uint loss) public {
+        require(msg.sender == address(scalp), "Only scalp can call this function");
+        _totalAssets -= loss;
+    }
+
     function beforeWithdraw(uint256 assets, uint256 /*shares*/ ) internal virtual override {
         require(assets <= totalAvailableAssets(), "Not enough available assets to satisfy withdrawal");
         /// -----------------------------------------------------------------------

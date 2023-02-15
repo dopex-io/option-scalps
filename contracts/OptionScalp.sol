@@ -86,6 +86,8 @@ Pausable {
         uint size;
         // Open position count (in base asset)
         uint positions;
+        // Amount borrowed
+        uint amountBorrowed;
         // Amount received from swap
         uint amountOut;
         // Entry price
@@ -348,6 +350,7 @@ Pausable {
             isShort: isShort,
             size: size,
             positions: size * divisor / markPrice,
+            amountBorrowed: isShort ? swapped : size / 10 ** 2,
             amountOut: isShort ? size / 10 ** 2 : swapped,
             entry: getMarkPrice(),
             margin: margin,
@@ -446,13 +449,31 @@ Pausable {
 
             baseLp.unlockLiquidity(swapped);
 
-            if (int(scalpPositions[id].margin) + pnl > 0) {
-                 amountToAddInsuranceFund = uint(int(scalpPositions[id].margin) + pnl);
-                 _swapExactOut(
-                    address(base),
+            if (scalpPositions[id].amountBorrowed > swapped) {
+                uint remainingMargin = uint(int(scalpPositions[id].margin) + pnl);
+
+                uint obtained = _swapExactIn(
                     address(quote),
-                    amountToAddInsuranceFund
+                    address(base),
+                    remainingMargin
                 );
+
+                if (scalpPositions[id].amountBorrowed > swapped + obtained) {
+                    // we account for LPs loss
+                    baseLp.subtractLoss(scalpPositions[id].amountBorrowed - swapped - obtained);
+
+                    // that liquidity does not exist anymore so we don't need to keep it locked
+                    baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed - swapped - obtained);
+                } else {
+                    // margin is enough to cover LPs loss
+                    // the remaining part goes to insuranceFund
+                    baseLp.deposit(swapped + obtained - scalpPositions[id].amountBorrowed, insuranceFund);
+                }
+            }
+            else {
+                uint extra = swapped - scalpPositions[id].amountBorrowed;
+                // we give extra money after loan is paid back to insuranceFund
+                baseLp.deposit(extra, insuranceFund);
             }
         } else {
             // base to quote
@@ -464,10 +485,33 @@ Pausable {
 
             quoteLp.unlockLiquidity(swapped);
 
-            if (int(scalpPositions[id].margin) + pnl > 0) amountToAddInsuranceFund = uint(int(scalpPositions[id].margin) + pnl);
-        }
+            if (scalpPositions[id].amountBorrowed > swapped) {
+                uint remainingMargin = uint(int(scalpPositions[id].margin) + pnl);
 
-        if (amountToAddInsuranceFund > 0) quoteLp.deposit(amountToAddInsuranceFund, insuranceFund);
+                uint obtained = _swapExactIn(
+                    address(base),
+                    address(quote),
+                    remainingMargin
+                );
+
+                if (scalpPositions[id].amountBorrowed > swapped + obtained) {
+                    // we account for LPs loss
+                    quoteLp.subtractLoss(scalpPositions[id].amountBorrowed - swapped - obtained);
+
+                    // that liquidity does not exist anymore so we don't need to keep it locked
+                    quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed - swapped - obtained);
+                } else {
+                    // margin is enough to cover LPs loss
+                    // the remaining part goes to insuranceFund
+                    quoteLp.deposit(swapped + obtained - scalpPositions[id].amountBorrowed, insuranceFund);
+                }
+            }
+            else {
+                uint extra = swapped - scalpPositions[id].amountBorrowed;
+                // we give extra money after loan is paid back to insuranceFund
+                quoteLp.deposit(extra, insuranceFund);
+            }
+        }
 
         emit LiquidatePosition(
             id,
