@@ -523,7 +523,7 @@ Pausable {
             strike,
             strike,
             getVolatility(strike)
-        )) * (size / strike));
+        )) * size / strike);
         
         premium = premium / (divisor / uint(10 ** quote.decimals()));
     }
