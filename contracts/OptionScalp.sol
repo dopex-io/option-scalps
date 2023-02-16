@@ -561,6 +561,7 @@ Pausable {
     internal
     view
     returns (uint premium) {
+        uint expiry = block.timestamp + timeToExpiry;
         premium = (uint(optionPricing.getOptionPrice(
             false, // ATM options: does not matter if call or put
             timeToExpiry,
