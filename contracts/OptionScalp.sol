@@ -259,7 +259,7 @@ contract OptionScalp is Ownable, Pausable {
         uint256 openingFees = calcFees(size / 10**2);
 
         // We transfer margin + premium + fees from user
-        quote.transferFrom(msg.sender, margin + premium + openingFees);
+        quote.transferFrom(msg.sender, address(this), margin + premium + openingFees);
 
         uint256 swapped;
         uint256 entry;
@@ -363,7 +363,7 @@ contract OptionScalp is Ownable, Pausable {
             // 1e18 * ie6 / ie18 = ie8
             price = (10 ** 18) * scalpPositions[id].amountOut / swapped;
 
-            pnl = calcEffectivePnl(id, price);
+            effectivePnl = calcEffectivePnl(id, price);
 
             baseLp.unlockLiquidity(swapped);
         } else {
@@ -378,22 +378,22 @@ contract OptionScalp is Ownable, Pausable {
             // 1e18 * ie6 / ie18 = ie8
             price = (10 ** 18) * swapped / scalpPositions[id].amountOut;
 
-            pnl = calcEffectivePnl(id, price);
+            effectivePnl = calcEffectivePnl(id, price);
 
             quoteLp.unlockLiquidity(swapped);
         }
 
         // Check margin is enough to cover pnl
-        require(int256(scalpPositions[id].margin) + pnl >= 0,
+        require(int256(scalpPositions[id].margin) + effectivePnl >= 0,
             "Insufficient margin to cover negative PnL, premium and fees"
         );
 
         quote.transfer(
             IERC721(scalpPositionMinter).ownerOf(id),
-            uint256(int256(scalpPositions[id].margin) + pnl)
+            uint256(int256(scalpPositions[id].margin) + effectivePnl)
         );
 
-        emit ClosePosition(id, pnl, msg.sender);
+        emit ClosePosition(id, effectivePnl, msg.sender);
     }
 
     /// @notice Liquidates an underCollateralized open position, all funds go to LPs
@@ -407,6 +407,7 @@ contract OptionScalp is Ownable, Pausable {
         uint256 amountToAddInsuranceFund;
         uint256 swapped;
         int256 pnl;
+        uint256 price;
 
         if (scalpPositions[id].isShort) {
             // quote to base
@@ -577,11 +578,11 @@ contract OptionScalp is Ownable, Pausable {
 
         uint256 markPrice = getMarkPrice();
         if (scalpPositions[id].isShort)
-            pnl = positions *
+            pnl = int256(scalpPositions[id].positions) *
                 (int256(scalpPositions[id].entry) - int256(markPrice)) /
                 10**2;
         else
-            pnl = positions *
+            pnl = int256(scalpPositions[id].positions) *
                 (int256(markPrice) - int256(scalpPositions[id].entry)) /
                 10**2;
     }
@@ -590,11 +591,11 @@ contract OptionScalp is Ownable, Pausable {
     /// @param id ID of position
     function calcEffectivePnl(uint256 id, uint256 effectivePrice) internal view returns (int256 pnl) {
         if (scalpPositions[id].isShort)
-            pnl = positions *
+            pnl = int256(scalpPositions[id].positions) *
                 (int256(scalpPositions[id].entry) - int256(effectivePrice)) /
                 10**2;
         else
-            pnl = positions *
+            pnl = int256(scalpPositions[id].positions) *
                 (int256(effectivePrice) - int256(scalpPositions[id].entry)) /
                 10**2;
     }
