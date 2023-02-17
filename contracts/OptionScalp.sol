@@ -360,8 +360,8 @@ contract OptionScalp is Ownable, Pausable {
             );
 
             // amountOut is ie6, swapped is ie18
-            // 1e18 * ie6 / ie18 = ie8
-            price = (10 ** 18) * scalpPositions[id].amountOut / swapped;
+            // 1e20 * ie6 / ie18 = ie8
+            price = (10 ** 20) * scalpPositions[id].amountOut / swapped;
 
             effectivePnl = calcEffectivePnl(id, price);
 
@@ -375,8 +375,8 @@ contract OptionScalp is Ownable, Pausable {
             );
 
             // amountOut is ie6, swapped is ie18
-            // 1e18 * ie6 / ie18 = ie8
-            price = (10 ** 18) * swapped / scalpPositions[id].amountOut;
+            // 1e20 * ie6 / ie18 = ie8
+            price = (10 ** 20) * swapped / scalpPositions[id].amountOut;
 
             effectivePnl = calcEffectivePnl(id, price);
 
@@ -402,9 +402,6 @@ contract OptionScalp is Ownable, Pausable {
         require(scalpPositions[id].isOpen, "Invalid position ID");
         require(isLiquidatable(id), "Position is not in liquidation range");
 
-        address positionOwner = IERC721(scalpPositionMinter).ownerOf(id);
-
-        uint256 amountToAddInsuranceFund;
         uint256 swapped;
         int256 pnl;
         uint256 price;
@@ -418,8 +415,8 @@ contract OptionScalp is Ownable, Pausable {
             );
 
             // amountOut is ie6, swapped is ie18
-            // 1e18 * ie6 / ie18 = ie8
-            price = (10 ** 18) * scalpPositions[id].amountOut / swapped;
+            // 1e20 * ie6 / ie18 = ie8
+            price = (10 ** 20) * scalpPositions[id].amountOut / swapped;
 
             pnl = calcEffectivePnl(id, price);
 
@@ -469,8 +466,8 @@ contract OptionScalp is Ownable, Pausable {
             );
 
             // amountOut is ie6, swapped is ie18
-            // 1e18 * ie6 / ie18 = ie8
-            price = (10 ** 18) * swapped / scalpPositions[id].amountOut;
+            // 1e20 * ie6 / ie18 = ie8
+            price = (10 ** 20) * swapped / scalpPositions[id].amountOut;
 
             pnl = calcEffectivePnl(id, price);
 
@@ -580,11 +577,11 @@ contract OptionScalp is Ownable, Pausable {
         if (scalpPositions[id].isShort)
             pnl = int256(scalpPositions[id].positions) *
                 (int256(scalpPositions[id].entry) - int256(markPrice)) /
-                10**2;
+                10**8;
         else
             pnl = int256(scalpPositions[id].positions) *
                 (int256(markPrice) - int256(scalpPositions[id].entry)) /
-                10**2;
+                10**8;
     }
 
     /// @notice Internal function to calculate effective pnl
@@ -593,11 +590,11 @@ contract OptionScalp is Ownable, Pausable {
         if (scalpPositions[id].isShort)
             pnl = int256(scalpPositions[id].positions) *
                 (int256(scalpPositions[id].entry) - int256(effectivePrice)) /
-                10**2;
+                10**8;
         else
             pnl = int256(scalpPositions[id].positions) *
                 (int256(effectivePrice) - int256(scalpPositions[id].entry)) /
-                10**2;
+                10**8;
     }
 
     /// @notice Public function to retrieve price of base asset from oracle
