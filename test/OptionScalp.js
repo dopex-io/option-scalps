@@ -74,7 +74,7 @@ describe("Option scalp", function() {
       params: ["0x9bf54297d9270730192a83EF583fF703599D9F18"],
     });
 
-    b50 = await ethers.provider.getSigner(
+    w = await ethers.provider.getSigner(
       "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13"
     );
 
@@ -122,12 +122,10 @@ describe("Option scalp", function() {
     expect(quoteOut).to.eq("5000000000");
   });
 
-  it("user 1 opens a $5000 short scalp position with 200$ of margin", async function() {
+  it("user 1 opens a short scalp position, eth drops 10%, position is closed", async function() {
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "20000000");
-  });
 
-  it("eth drops 10%, position is closed", async function() {
     await priceOracle.updateUnderlyingPrice("90000000000");
     const markPrice = await optionScalp.getMarkPrice();
     expect(markPrice).to.eq("90000000000");
@@ -146,4 +144,27 @@ describe("Option scalp", function() {
 
     expect(profit).to.eq("13566657"); // $135.66
   });
+
+  it("user 1 opens a short scalp position, eth pumps 10%, position is closed", async function() {
+
+  });
+
+  it("user 1 opens a long scalp position, eth pumps 10%, position is closed", async function() {
+  });
+
+  it("user 1 opens a long scalp position, eth drops 10%, position is closed", async function() {
+  });
+
+  it("user 1 opens a short scalp position, eth pumps 10%, position is liquidated", async function() {
+  });
+
+  it("user 1 opens a long scalp position, eth drops 10%, position is liquidated", async function() {
+  });
+
+  it("user 0 withdraws eth deposit with pnl", async function() {
+  });
+
+  it("user 0 withdraws usd deposit with pnl", async function() {
+  });
+
 });
