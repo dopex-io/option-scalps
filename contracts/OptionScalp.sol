@@ -349,7 +349,7 @@ contract OptionScalp is Ownable, Pausable {
         uint256 swapped;
         uint256 price;
 
-        int256 effectivePnl;
+        int256 actualPnl;
 
         if (scalpPositions[id].isShort) {
             // quote to base
@@ -363,7 +363,7 @@ contract OptionScalp is Ownable, Pausable {
             // 1e20 * ie6 / ie18 = ie8
             price = (10 ** 20) * scalpPositions[id].amountOut / swapped;
 
-            effectivePnl = calcEffectivePnl(id, price);
+            actualPnl = calcActualPnl(id, price);
 
             baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
         } else {
@@ -378,22 +378,22 @@ contract OptionScalp is Ownable, Pausable {
             // 1e20 * ie6 / ie18 = ie8
             price = (10 ** 20) * swapped / scalpPositions[id].amountOut;
 
-            effectivePnl = calcEffectivePnl(id, price);
+            actualPnl = calcActualPnl(id, price);
 
             quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
         }
 
         // Check margin is enough to cover pnl
-        require(int256(scalpPositions[id].margin) + effectivePnl >= 0,
+        require(int256(scalpPositions[id].margin) + actualPnl >= 0,
             "Insufficient margin to cover negative PnL, premium and fees"
         );
 
         quote.transfer(
             IERC721(scalpPositionMinter).ownerOf(id),
-            uint256(int256(scalpPositions[id].margin) + effectivePnl)
+            uint256(int256(scalpPositions[id].margin) + actualPnl)
         );
 
-        emit ClosePosition(id, effectivePnl, msg.sender);
+        emit ClosePosition(id, actualPnl, msg.sender);
     }
 
     /// @notice Liquidates an underCollateralized open position, all funds go to LPs
@@ -418,7 +418,7 @@ contract OptionScalp is Ownable, Pausable {
             // 1e20 * ie6 / ie18 = ie8
             price = (10 ** 20) * scalpPositions[id].amountOut / swapped;
 
-            pnl = calcEffectivePnl(id, price);
+            pnl = calcActualPnl(id, price);
 
             baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
@@ -469,7 +469,7 @@ contract OptionScalp is Ownable, Pausable {
             // 1e20 * ie6 / ie18 = ie8
             price = (10 ** 20) * swapped / scalpPositions[id].amountOut;
 
-            pnl = calcEffectivePnl(id, price);
+            pnl = calcActualPnl(id, price);
 
             quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
@@ -584,16 +584,16 @@ contract OptionScalp is Ownable, Pausable {
                 10**8;
     }
 
-    /// @notice Internal function to calculate effective pnl
+    /// @notice Internal function to calculate actual pnl
     /// @param id ID of position
-    function calcEffectivePnl(uint256 id, uint256 effectivePrice) internal view returns (int256 pnl) {
+    function calcActualPnl(uint256 id, uint256 actualPrice) internal view returns (int256 pnl) {
         if (scalpPositions[id].isShort)
             pnl = int256(scalpPositions[id].positions) *
-                (int256(scalpPositions[id].entry) - int256(effectivePrice)) /
+                (int256(scalpPositions[id].entry) - int256(actualPrice)) /
                 10**8;
         else
             pnl = int256(scalpPositions[id].positions) *
-                (int256(effectivePrice) - int256(scalpPositions[id].entry)) /
+                (int256(actualPrice) - int256(scalpPositions[id].entry)) /
                 10**8;
     }
 
