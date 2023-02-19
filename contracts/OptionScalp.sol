@@ -365,7 +365,7 @@ contract OptionScalp is Ownable, Pausable {
 
             effectivePnl = calcEffectivePnl(id, price);
 
-            baseLp.unlockLiquidity(swapped);
+            baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
         } else {
             // base to quote
             swapped = _swapExactIn(
@@ -380,7 +380,7 @@ contract OptionScalp is Ownable, Pausable {
 
             effectivePnl = calcEffectivePnl(id, price);
 
-            quoteLp.unlockLiquidity(swapped);
+            quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
         }
 
         // Check margin is enough to cover pnl
@@ -420,7 +420,7 @@ contract OptionScalp is Ownable, Pausable {
 
             pnl = calcEffectivePnl(id, price);
 
-            baseLp.unlockLiquidity(swapped);
+            baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
             if (scalpPositions[id].amountBorrowed > swapped) {
                 uint256 remainingMargin = uint256(
@@ -471,7 +471,7 @@ contract OptionScalp is Ownable, Pausable {
 
             pnl = calcEffectivePnl(id, price);
 
-            quoteLp.unlockLiquidity(swapped);
+            quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
             if (scalpPositions[id].amountBorrowed > swapped) {
                 uint256 remainingMargin = uint256(
@@ -516,7 +516,7 @@ contract OptionScalp is Ownable, Pausable {
     function isLiquidatable(uint256 id) public view returns (bool) {
         return int256(scalpPositions[id].margin) + calcPnl(id) <=
             int256(minimumAbsoluteLiquidationThreshold) *
-                int256(scalpPositions[id].positions);
+                int256(scalpPositions[id].positions) / 10 ** 8;
     }
 
     /// @notice Allow only scalp LP contract to claim collateral

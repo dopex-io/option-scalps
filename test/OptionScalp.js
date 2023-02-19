@@ -10,12 +10,15 @@ describe("Option scalp", function() {
   let weth;
   let quoteLp;
   let baseLp;
+  let uniV3Router;
   let priceOracle;
   let volatilityOracle;
   let optionPricing;
   let optionScalp;
   let b50;
   let bf5;
+  let b50Address;
+  let bf5Address;
 
   before(async () => {
     signers = await ethers.getSigners();
@@ -32,7 +35,9 @@ describe("Option scalp", function() {
     // USDC
     usdc = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8");
     // WETH
-    weth = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1");
+    weth = await ethers.getContractAt("contracts/interface/IWETH9.sol:IWETH9", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1");
+    // Uni v3 router
+    uniV3Router = await ethers.getContractAt("contracts/interface/IUniswapV3Router.sol:IUniswapV3Router", "0xE592427A0AEce92De3Edee1F18E0157C05861564");
     // Price oracle
     const PriceOracle = await ethers.getContractFactory("MockPriceOracle");
     priceOracle = await PriceOracle.deploy();
@@ -74,12 +79,15 @@ describe("Option scalp", function() {
       params: ["0x9bf54297d9270730192a83EF583fF703599D9F18"],
     });
 
-    w = await ethers.provider.getSigner(
-      "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13"
+    b50Address = "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13";
+    bf5Address = "0x9bf54297d9270730192a83EF583fF703599D9F18";
+
+    b50 = await ethers.provider.getSigner(
+      b50Address
     );
 
     bf5 = await ethers.provider.getSigner(
-      "0x9bf54297d9270730192a83EF583fF703599D9F18"
+      bf5Address
     );
 
     [user0, user1, user2, user3].map(async user => {
@@ -122,31 +130,80 @@ describe("Option scalp", function() {
     expect(quoteOut).to.eq("5000000000");
   });
 
-  it("user 1 opens a short scalp position, eth drops 10%, position is closed", async function() {
+  it("user 1 opens a short scalp position, eth drops, position is closed", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq('10000000000');
+
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "20000000");
 
-    await priceOracle.updateUnderlyingPrice("90000000000");
-    const markPrice = await optionScalp.getMarkPrice();
-    expect(markPrice).to.eq("90000000000");
+    let quoteBalance = await usdc.balanceOf(user1.address);
+    expect(quoteBalance).to.eq('9979725000');
 
-    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    await weth.connect(b50).deposit({value: ethers.utils.parseEther("260.0")});
+    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("260.0"));
 
-    expect(startQuoteBalance).to.eq('9979725000');
+    await uniV3Router.connect(b50).exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("260.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    );
+
+    quoteBalance = await usdc.balanceOf(user1.address);
+
+    expect(quoteBalance).to.eq('9979725000');
 
     await optionScalp.connect(user1).closePosition(0);
 
-    const endQuoteBalance = await usdc.balanceOf(user1.address);
+    quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(endQuoteBalance).to.eq('9993291657');
+    expect(quoteBalance).to.eq('10030524783');
 
-    const profit = endQuoteBalance.sub(startQuoteBalance);
+    const profit = quoteBalance.sub(startQuoteBalance);
 
-    expect(profit).to.eq("13566657"); // $135.66
+    expect(profit).to.eq("30524783"); // $305.24
   });
 
-  it("user 1 opens a short scalp position, eth pumps 10%, position is closed", async function() {
+  it("user 1 opens a short scalp position, eth pumps, position is closed", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq('10030524783');
 
+    await usdc.connect(user1).approve(optionScalp.address, "10000000000");
+    await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "90000000");
+
+    const b50UsdcBalance = await usdc.balanceOf(b50Address);
+    await usdc.connect(b50).approve(uniV3Router.address, b50UsdcBalance);
+
+    await usdc.connect(bf5).approve(uniV3Router.address, "150000000000");
+
+    await uniV3Router.connect(b50).exactInputSingle(
+        {
+          tokenIn: usdc.address,
+          tokenOut: weth.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: "150000000000",
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    );
+
+    await optionScalp.connect(user1).closePosition(1);
+
+    let quoteBalance = await usdc.balanceOf(user1.address);
+    expect(quoteBalance).to.eq('10004376749');
+
+    const profit = quoteBalance.sub(startQuoteBalance);
+
+    expect(profit).to.eq("-26148034"); // -$26.14
   });
 
   it("user 1 opens a long scalp position, eth pumps 10%, position is closed", async function() {
@@ -166,5 +223,4 @@ describe("Option scalp", function() {
 
   it("user 0 withdraws usd deposit with pnl", async function() {
   });
-
 });
