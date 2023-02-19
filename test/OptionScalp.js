@@ -206,16 +206,82 @@ describe("Option scalp", function() {
     expect(profit).to.eq("-26148034"); // -$26.14
   });
 
-  it("user 1 opens a long scalp position, eth pumps 10%, position is closed", async function() {
+  it("user 1 opens a long scalp position, eth pumps, position is closed", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq('10004376749');
+
+    await usdc.connect(user1).approve(optionScalp.address, "10000000000");
+    await optionScalp.connect(user1).openPosition(false, "5000000000", 0, "90000000");
+
+    await usdc.connect(bf5).approve(uniV3Router.address, "1500000000000");
+
+    await uniV3Router.connect(bf5).exactInputSingle(
+        {
+          tokenIn: usdc.address,
+          tokenOut: weth.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: "1500000000000",
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    );
+
+    await optionScalp.connect(user1).closePosition(2);
+
+    let quoteBalance = await usdc.balanceOf(user1.address);
+    expect(quoteBalance).to.eq('10272372560');
+
+    const profit = quoteBalance.sub(startQuoteBalance);
+
+    expect(profit).to.eq("267995811"); // -$267.99
   });
 
-  it("user 1 opens a long scalp position, eth drops 10%, position is closed", async function() {
+  it("user 1 opens a long scalp position, eth drops, position is closed", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq('10272372560');
+
+    await usdc.connect(user1).approve(optionScalp.address, "10000000000");
+    await optionScalp.connect(user1).openPosition(false, "5000000000", 0, "80000000");
+
+    let quoteBalance = await usdc.balanceOf(user1.address);
+    expect(quoteBalance).to.eq('10192097560');
+
+    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("30.0"));
+
+    await uniV3Router.connect(b50).exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("30.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    );
+
+    quoteBalance = await usdc.balanceOf(user1.address);
+
+    expect(quoteBalance).to.eq('10192097560');
+
+    await optionScalp.connect(user1).closePosition(3);
+
+    quoteBalance = await usdc.balanceOf(user1.address);
+
+    expect(quoteBalance).to.eq('10255284526');
+
+    const profit = quoteBalance.sub(startQuoteBalance);
+
+    expect(profit).to.eq("-17088034"); // $17.08
   });
 
-  it("user 1 opens a short scalp position, eth pumps 10%, position is liquidated", async function() {
+  it("user 1 opens a short scalp position, eth pumps, position is liquidated", async function() {
   });
 
-  it("user 1 opens a long scalp position, eth drops 10%, position is liquidated", async function() {
+  it("user 1 opens a long scalp position, eth drops, position is liquidated", async function() {
   });
 
   it("user 0 withdraws eth deposit with pnl", async function() {

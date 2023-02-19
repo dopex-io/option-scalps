@@ -393,6 +393,8 @@ contract OptionScalp is Ownable, Pausable {
             uint256(int256(scalpPositions[id].margin) + actualPnl)
         );
 
+        scalpPositions[id].isOpen = false;
+
         emit ClosePosition(id, actualPnl, msg.sender);
     }
 
