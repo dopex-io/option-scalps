@@ -284,9 +284,15 @@ describe("Option scalp", function() {
   it("user 1 opens a long scalp position, eth drops, position is liquidated", async function() {
   });
 
-  it("user 0 withdraws eth deposit with pnl", async function() {
+  it("user 0 withdraws portion of eth deposit with pnl", async function() {
   });
 
-  it("user 0 withdraws usd deposit with pnl", async function() {
+  it("user 0 withdraws portion of usd deposit with pnl", async function() {
+  });
+
+  it("user 1 opens a long scalp position and user 0 cannot withdraw more than available liquidity", async function() {
+  });
+
+  it("user 1 closes long scalp position and user 0 withdraws remaining available liquidity", async function() {
   });
 });
