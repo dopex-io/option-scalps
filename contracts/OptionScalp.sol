@@ -357,30 +357,30 @@ contract OptionScalp is Ownable, Pausable {
 
         if (scalpPositions[id].isShort) {
             // quote to base
-            swapped = _swapExactIn(
+            swapped = _swapExactOut(
                 address(quote),
                 address(base),
-                scalpPositions[id].amountOut
+                scalpPositions[id].amountBorrowed
             );
 
-            // amountOut is ie6, swapped is ie18
+            // amountBorrowed is ie18, swapped is ie6
             // 1e20 * ie6 / ie18 = ie8
-            price = (10 ** 20) * scalpPositions[id].amountOut / swapped;
+            price = (10 ** 20) * swapped / scalpPositions[id].amountBorrowed;
 
             actualPnl = calcActualPnl(id, price);
 
             baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
         } else {
             // base to quote
-            swapped = _swapExactIn(
+            swapped = _swapExactOut(
                 address(base),
                 address(quote),
-                scalpPositions[id].amountOut
+                scalpPositions[id].amountBorrowed
             );
 
-            // amountOut is ie6, swapped is ie18
+            // amountBorrowed is ie6, swapped is ie18
             // 1e20 * ie6 / ie18 = ie8
-            price = (10 ** 20) * swapped / scalpPositions[id].amountOut;
+            price = (10 ** 20) * scalpPositions[id].amountBorrowed / swapped;
 
             actualPnl = calcActualPnl(id, price);
 
@@ -396,6 +396,16 @@ contract OptionScalp is Ownable, Pausable {
             IERC721(scalpPositionMinter).ownerOf(id),
             uint256(int256(scalpPositions[id].margin) + actualPnl)
         );
+
+        if (actualPnl < 0 && !scalpPositions[id].isShort) {
+            // if we had to swap more base than amountOut to cover the loan and we use a part of user margin for it
+            // we need to swap that part of margin to base
+            _swapExactIn(
+                address(quote),
+                address(base),
+                uint(actualPnl * -1)
+            );
+        }
 
         scalpPositions[id].isOpen = false;
 

@@ -200,27 +200,25 @@ describe("Option scalp", function() {
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('10092111377');
+    expect(quoteBalance).to.eq('10092117978');
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
     // $124.70 - 25$ of premium - 2.5$ of fees = $97.2
     // it is slightly different because we move the price too when we enter and close the position
     // so 1285 and 1253 are not exactly our correct entry and exit price
-    expect(profit).to.eq("92111377"); // $92.11
+    expect(profit).to.eq("92117978"); // $92.11
   });
 
   it("user 1 opens a short scalp position, eth pumps, position is closed", async function() {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10092111377');
-
-    console.log("test");
+    expect(startQuoteBalance).to.eq('10092117978');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "20000000"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9952500000');
+    expect(quoteBalance).to.eq('10044617978');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
     expect(amountPaid).to.eq("47500000"); // 20$ of margin + 25$ of premium + 2.5$ of fees
