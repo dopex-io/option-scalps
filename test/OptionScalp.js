@@ -208,6 +208,9 @@ describe("Option scalp", function() {
     // it is slightly different because we move the price too when we enter and close the position
     // so 1285 and 1253 are not exactly our correct entry and exit price
     expect(profit).to.eq("92117978"); // $92.11
+
+    // check if math is 100% correct
+    await optionScalp.checkMath();
   });
 
   it("user 1 opens a short scalp position, eth pumps, position is closed", async function() {
@@ -228,8 +231,6 @@ describe("Option scalp", function() {
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1000000000.0"));
     await usdc.connect(bf5).approve(uniV3Router.address, "150000000000");
 
-    console.log("test");
-
     let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
         {
           tokenIn: weth.address,
@@ -243,9 +244,7 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    console.log('test');
-
-    expect(actualPrice).to.eq("128555210800"); // $1285.55
+    expect(actualPrice).to.eq("125381453300"); // $1253.81
 
     await uniV3Router.connect(b50).exactInputSingle(
         {
@@ -273,9 +272,9 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("125353431000"); // $1253.53
+    expect(actualPrice).to.eq("125815957500"); // $1258.15
 
-    // price drops from 1285.67 to 1253.53 = $32.14
+    // price drops from 1285.67 to 1258.15 = $27.52
     // size was $5000 so positions is 5000 / 1285.55 = 3.88, expected profit is 3.88 * 32.14 = $124.70
 
     await optionScalp.connect(user1).closePosition(1);
