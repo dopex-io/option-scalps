@@ -256,7 +256,7 @@ contract OptionScalp is Ownable, Pausable {
         );
 
         // Calculate opening fees in quote
-        uint256 openingFees = calcFees(size / 10**2);
+        uint256 openingFees = calcFees(size / 10 ** 2);
 
         // We transfer margin + premium + fees from user
         quote.transferFrom(msg.sender, address(this), margin + premium + openingFees);
@@ -282,6 +282,10 @@ contract OptionScalp is Ownable, Pausable {
         } else {
             // quote to base
             require(quoteLp.totalAvailableAssets() >= size / 10 ** 2, "Insufficient liquidity");
+
+            console.log(quoteLp.totalAvailableAssets());
+            console.log(size / 10 ** 2);
+            console.log(quote.balanceOf(address(this)));
 
             swapped = _swapExactIn(address(quote), address(base), size / 10 ** 2);
 
@@ -319,7 +323,7 @@ contract OptionScalp is Ownable, Pausable {
             isOpen: true,
             isShort: isShort,
             size: size,
-            positions: (size * divisor) / markPrice,
+            positions: (size * divisor) / entry,
             amountBorrowed: isShort ? swapped : size / 10**2,
             amountOut: isShort ? size / 10**2 : swapped,
             entry: entry,
@@ -588,15 +592,16 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Internal function to calculate actual pnl
     /// @param id ID of position
+    /// @param pnl computed using actual price ie6
     function calcActualPnl(uint256 id, uint256 actualPrice) internal view returns (int256 pnl) {
         if (scalpPositions[id].isShort)
             pnl = int256(scalpPositions[id].positions) *
                 (int256(scalpPositions[id].entry) - int256(actualPrice)) /
-                10**8;
+                10**10;
         else
             pnl = int256(scalpPositions[id].positions) *
                 (int256(actualPrice) - int256(scalpPositions[id].entry)) /
-                10**8;
+                10**10;
     }
 
     /// @notice Public function to retrieve price of base asset from oracle
