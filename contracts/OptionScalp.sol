@@ -405,6 +405,13 @@ contract OptionScalp is Ownable, Pausable {
                 address(base),
                 uint(actualPnl * -1)
             );
+        } else if (actualPnl > 0 && !scalpPositions[id].isShort){
+            // we need to swap base to quote to cover the pnl sent to the user
+            _swapExactOut(
+                address(base),
+                address(quote),
+                uint(actualPnl)
+            );
         }
 
         scalpPositions[id].isOpen = false;
