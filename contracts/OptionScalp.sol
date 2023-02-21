@@ -283,10 +283,6 @@ contract OptionScalp is Ownable, Pausable {
             // quote to base
             require(quoteLp.totalAvailableAssets() >= size / 10 ** 2, "Insufficient liquidity");
 
-            console.log(quoteLp.totalAvailableAssets());
-            console.log(size / 10 ** 2);
-            console.log(quote.balanceOf(address(this)));
-
             swapped = _swapExactIn(address(quote), address(base), size / 10 ** 2);
 
             // size is ie8, swapped is ie18
@@ -446,14 +442,10 @@ contract OptionScalp is Ownable, Pausable {
             baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
             if (scalpPositions[id].amountBorrowed > swapped) {
-                uint256 remainingMargin = uint256(
-                    int256(scalpPositions[id].margin) + pnl
-                );
-
                 uint256 obtained = _swapExactIn(
                     address(quote),
                     address(base),
-                    remainingMargin
+                    scalpPositions[id].margin
                 );
 
                 if (scalpPositions[id].amountBorrowed > swapped + obtained) {
@@ -464,11 +456,12 @@ contract OptionScalp is Ownable, Pausable {
 
                     // that liquidity does not exist anymore so we don't need to keep it locked
                     baseLp.unlockLiquidity(
-                        scalpPositions[id].amountBorrowed - swapped - obtained
+                        min(baseLp._lockedLiquidity(), scalpPositions[id].amountBorrowed - swapped - obtained)
                     );
                 } else {
                     // margin is enough to cover LPs loss
                     // the remaining part goes to insuranceFund
+
                     baseLp.deposit(
                         swapped + obtained - scalpPositions[id].amountBorrowed,
                         insuranceFund
@@ -497,15 +490,7 @@ contract OptionScalp is Ownable, Pausable {
             quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
             if (scalpPositions[id].amountBorrowed > swapped) {
-                uint256 remainingMargin = uint256(
-                    int256(scalpPositions[id].margin) + pnl
-                );
-
-                uint256 obtained = _swapExactIn(
-                    address(base),
-                    address(quote),
-                    remainingMargin
-                );
+                uint256 obtained = scalpPositions[id].margin;
 
                 if (scalpPositions[id].amountBorrowed > swapped + obtained) {
                     // we account for LPs loss
@@ -515,7 +500,7 @@ contract OptionScalp is Ownable, Pausable {
 
                     // that liquidity does not exist anymore so we don't need to keep it locked
                     quoteLp.unlockLiquidity(
-                        scalpPositions[id].amountBorrowed - swapped - obtained
+                        min(quoteLp._lockedLiquidity(), scalpPositions[id].amountBorrowed - swapped - obtained)
                     );
                 } else {
                     // margin is enough to cover LPs loss
@@ -641,5 +626,13 @@ contract OptionScalp is Ownable, Pausable {
         console.log(baseLp.totalAssets());
         console.log("BASE TOTAL AVAILABLE ASSETS");
         console.log(baseLp.totalAvailableAssets());
+    }
+
+    function max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a >= b ? a : b;
+    }
+
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a <= b ? a : b;
     }
 }
