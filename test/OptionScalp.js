@@ -757,4 +757,10 @@ describe("Option scalp", function() {
 
   it("user 1 closes long scalp position and user 0 withdraws remaining available liquidity", async function() {
   });
+
+  it("user 1 cannot open position larger than max size", async function() {
+  });
+
+  it("user 1 cannot open position when exceeding max open interest", async function() {
+  });
 });
