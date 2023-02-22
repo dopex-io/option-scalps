@@ -31,7 +31,7 @@ contract OptionScalp is Ownable, Pausable {
     IERC20 public quote;
     // Scalp Base LP token
     ScalpLP public baseLp;
-    // Scalp Quotee LP token
+    // Scalp Quote LP token
     ScalpLP public quoteLp;
 
     // Option pricing
@@ -65,6 +65,15 @@ contract OptionScalp is Ownable, Pausable {
 
     // Minimum absolute threshold in quote asset above (entry - margin) when liquidate() is callable
     uint256 public minimumAbsoluteLiquidationThreshold = 5e6; // $5
+
+    // Max size of a position (ie8)
+    uint256 public maxSize = 100000e8; // $100k
+
+    // Max open interest (ie6)
+    uint256 public maxOpenInterest = 10000000e8; // $10M
+
+    // Open interest (ie6)
+    mapping(bool => uint256) public openInterest;
 
     uint256 public constant divisor = 1e8;
 
@@ -245,6 +254,10 @@ contract OptionScalp is Ownable, Pausable {
     ) public returns (uint256 id) {
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
+        require(size <= maxSize, "Your size is really size");
+        require((size / 10 ** 2) + openInterest[isShort] <= maxOpenInterest, "OI is too high");
+
+        openInterest[isShort] += size / 10 ** 2;
 
         uint256 markPrice = getMarkPrice();
 
