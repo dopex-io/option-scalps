@@ -438,7 +438,7 @@ describe("Option scalp", function() {
     await optionScalp.checkMath();
   });
 
-  it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is not enough", async function() {
+  it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is enough", async function() {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
     expect(startQuoteBalance).to.eq('10026022794');
 
@@ -587,6 +587,160 @@ describe("Option scalp", function() {
 
     // - $120 of margin - 19.49 of premium - 2.5$ of fees = - $141.99
     expect(profit).to.eq("-141997960"); // $141.99
+
+    // check if math is 100% correct
+    await optionScalp.checkMath();
+  });
+
+  it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is not enough", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq('9824524834');
+
+    await usdc.connect(user1).approve(optionScalp.address, "10000000000");
+    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "30000000"); // 5000$ short
+
+    let quoteBalance = await usdc.balanceOf(user1.address);
+    expect(quoteBalance).to.eq('9772064648');
+
+    const amountPaid = startQuoteBalance.sub(quoteBalance);
+    expect(amountPaid).to.eq("52460186"); // 30$ of margin + 19.96$ of premium + 2.5$ of fees
+
+    const b50UsdcBalance = await usdc.balanceOf(b50Address);
+    await usdc.connect(b50).approve(uniV3Router.address, b50UsdcBalance);
+    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1000000000.0"));
+    await usdc.connect(bf5).approve(uniV3Router.address, "550000000000");
+
+    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("1.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    )).mul(BigNumber.from("100"));
+
+    expect(actualPrice).to.eq("125221371200"); // $1252.21
+
+    await uniV3Router.connect(b50).exactInputSingle(
+        {
+          tokenIn: usdc.address,
+          tokenOut: weth.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: "250000000000",
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    );
+
+    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("1.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    )).mul(BigNumber.from("100"));
+
+    expect(actualPrice).to.eq("125952385100"); // $1259.52
+
+    // price pumps from 1252.21 to 1259.52 = -$7.31
+    // size was $5000 so positions is 5000 / 1252.21 = 3.99, expected profit is 3.99 * -7.31 = -$29.16
+
+    await priceOracle.updateUnderlyingPrice("125952385100");
+
+    await optionScalp.connect(user1).liquidate(6);
+
+    quoteBalance = await usdc.balanceOf(user1.address);
+
+    expect(quoteBalance).to.eq('9772064648');
+
+    const profit = quoteBalance.sub(startQuoteBalance);
+
+    // -30$ margin - 19.96$ of premium - 2.5$ of fees = $52.46
+    expect(profit).to.eq("-52460186");
+
+    // check if math is 100% correct
+    await optionScalp.checkMath();
+  });
+
+  it("user 1 opens a long scalp position, eth drops, position is liquidated and margin is enough", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq('9772064648');
+
+    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("1.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    )).mul(BigNumber.from("100"));
+
+    expect(actualPrice).to.eq("125968246600"); // $1259.68
+
+    await usdc.connect(user1).approve(optionScalp.address, "10000000000");
+    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "150000000");
+
+    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
+
+    await uniV3Router.connect(b50).exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("500.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    );
+
+    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1.0"));
+
+    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("1.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    )).mul(BigNumber.from("100"));
+
+    expect(actualPrice).to.eq("124168736000"); // $1241.68
+
+    // price pumps from 1259.68 to 1241.68 = -$18
+    // size was $5000 so positions is 5000 / 1259.68 = 3.96, expected profit is 3.96 * -18 = -$71.28
+
+    await priceOracle.updateUnderlyingPrice("124168736000");
+
+    await optionScalp.liquidate(7);
+
+    let quoteBalance = await usdc.balanceOf(user1.address);
+    expect(quoteBalance).to.eq('9599715878');
+
+    const profit = quoteBalance.sub(startQuoteBalance);
+
+    // - $150 of margin - 19.84 of premium - 2.5$ of fees
+    expect(profit).to.eq("-172348770"); // $172.34
 
     // check if math is 100% correct
     await optionScalp.checkMath();

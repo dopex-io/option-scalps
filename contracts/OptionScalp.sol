@@ -255,6 +255,9 @@ contract OptionScalp is Ownable, Pausable {
             timeframes[timeframeIndex]
         );
 
+        console.log("Premium");
+        console.log(premium);
+
         // Calculate opening fees in quote
         uint256 openingFees = calcFees(size / 10 ** 2);
 
@@ -449,6 +452,8 @@ contract OptionScalp is Ownable, Pausable {
                 );
 
                 if (scalpPositions[id].amountBorrowed > swapped + obtained) {
+                    console.log("LP LOSS");
+
                     // we account for LPs loss
                     baseLp.subtractLoss(
                         scalpPositions[id].amountBorrowed - swapped - obtained
@@ -459,9 +464,10 @@ contract OptionScalp is Ownable, Pausable {
                         min(baseLp._lockedLiquidity(), scalpPositions[id].amountBorrowed - swapped - obtained)
                     );
                 } else {
+                    console.log("NO LP LOSS");
+
                     // margin is enough to cover LPs loss
                     // the remaining part goes to insuranceFund
-
                     baseLp.deposit(
                         swapped + obtained - scalpPositions[id].amountBorrowed,
                         insuranceFund
@@ -493,6 +499,8 @@ contract OptionScalp is Ownable, Pausable {
                 uint256 obtained = scalpPositions[id].margin;
 
                 if (scalpPositions[id].amountBorrowed > swapped + obtained) {
+                    console.log("LP LOSS");
+
                     // we account for LPs loss
                     quoteLp.subtractLoss(
                         scalpPositions[id].amountBorrowed - swapped - obtained
@@ -503,6 +511,8 @@ contract OptionScalp is Ownable, Pausable {
                         min(quoteLp._lockedLiquidity(), scalpPositions[id].amountBorrowed - swapped - obtained)
                     );
                 } else {
+                    console.log("NO LP LOSS");
+
                     // margin is enough to cover LPs loss
                     // the remaining part goes to insuranceFund
                     quoteLp.deposit(
@@ -516,6 +526,8 @@ contract OptionScalp is Ownable, Pausable {
                 quoteLp.deposit(extra, insuranceFund);
             }
         }
+
+        scalpPositions[id].isOpen = false;
 
         emit LiquidatePosition(id, pnl, msg.sender);
     }
