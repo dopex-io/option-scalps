@@ -64,6 +64,12 @@ describe("Option scalp", function() {
        "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13" // Insurace fund
     );
 
+    // Base LP
+    baseLp = (await ethers.getContractFactory("ScalpLP")).attach((await optionScalp.baseLp()));
+
+    // Quote LP
+    quoteLp = (await ethers.getContractFactory("ScalpLP")).attach((await optionScalp.quoteLp()));
+
     console.log("deployed option scalp:", optionScalp.address);
   });
 
@@ -747,15 +753,114 @@ describe("Option scalp", function() {
   });
 
   it("user 0 withdraws portion of eth deposit with pnl", async function() {
+    const startBaseBalance = await weth.balanceOf(user0.address);
+
+    await baseLp.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("3.0"));
+    await optionScalp.connect(user0).withdraw(false, ethers.utils.parseEther("3.0"));
+
+    const endBaseBalance = await weth.balanceOf(user0.address);
+
+    const difference = endBaseBalance.sub(startBaseBalance);
+
+    expect(difference).to.eq("3021431892228299172");
+
+    // check if math is 100% correct
+    await optionScalp.checkMath();
   });
 
   it("user 0 withdraws portion of usd deposit with pnl", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user0.address);
+
+    await quoteLp.connect(user0).approve(optionScalp.address, "2000000000");
+    await optionScalp.connect(user0).withdraw(true, "2000000000");
+
+    const endQuoteBalance = await usdc.balanceOf(user0.address);
+
+    const difference = endQuoteBalance.sub(startQuoteBalance);
+
+    expect(difference).to.eq("2035107853");
+
+    // check if math is 100% correct
+    await optionScalp.checkMath();
   });
 
   it("user 1 opens a long scalp position and user 0 cannot withdraw more than available liquidity", async function() {
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq('9599715878');
+
+    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("1.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    )).mul(BigNumber.from("100"));
+
+    expect(actualPrice).to.eq("124154881700"); // $1241.54
+
+    console.log("Test");
+
+    await usdc.connect(user1).approve(optionScalp.address, "10000000000");
+    await optionScalp.connect(user1).openPosition(false, "100000000000", 0, "150000000");
+
+    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
+
+    console.log("Test");
+
+    await uniV3Router.connect(b50).exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("15.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    );
+
+    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1.0"));
+
+    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
+        {
+          tokenIn: weth.address,
+          tokenOut: usdc.address,
+          fee: 500,
+          recipient: b50Address,
+          deadline: "999999999999999999999999",
+          amountIn: ethers.utils.parseEther("1.0"),
+          amountOutMinimum: 1,
+          sqrtPriceLimitX96: 0
+        }
+    )).mul(BigNumber.from("100"));
+
+    expect(actualPrice).to.eq("124105300900"); // $1241.05
+
+    // price pumps from 1241.54 to 1241.05 = -$0.49
+    // size was $5000 so positions is 5000 / 1241.54 = 4.027, expected profit is 4.027 * -0.49 = -$-1.97323
+
+    await priceOracle.updateUnderlyingPrice("124105300900");
+
+    await quoteLp.connect(user0).approve(optionScalp.address, "3000000000");
+    await expect(optionScalp.connect(user0).withdraw(true, "3000000000")).to.be.revertedWith("Not enough available assets to satisfy withdrawal");
   });
 
   it("user 1 closes long scalp position and user 0 withdraws remaining available liquidity", async function() {
+    await optionScalp.checkMath();
+
+    await optionScalp.connect(user1).closePosition(8);
+
+    await optionScalp.checkMath();
+
+    await optionScalp.connect(user0).withdraw(true, "3000000000");
+
+    await optionScalp.checkMath();
   });
 
   it("user 1 cannot open position larger than max size", async function() {

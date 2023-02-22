@@ -283,6 +283,7 @@ contract OptionScalp is Ownable, Pausable {
 
             baseLp.lockLiquidity(swapped);
         } else {
+
             // quote to base
             require(quoteLp.totalAvailableAssets() >= size / 10 ** 2, "Insufficient liquidity");
 
