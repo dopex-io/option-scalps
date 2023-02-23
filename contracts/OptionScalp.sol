@@ -70,10 +70,10 @@ contract OptionScalp is Ownable, Pausable {
     // Max size of a position (ie8)
     uint256 public maxSize = 100000e8; // $100k
 
-    // Max open interest (ie6)
-    uint256 public maxOpenInterest = 10000000e6; // $10M
+    // Max open interest (ie8)
+    uint256 public maxOpenInterest = 10000000e8; // $10M
 
-    // Open interest (ie6)
+    // Open interest (ie8)
     mapping(bool => uint256) public openInterest;
 
     uint256 public constant divisor = 1e8;
@@ -255,13 +255,13 @@ contract OptionScalp is Ownable, Pausable {
     ) public returns (uint256 id) {
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
-        require(size <= maxSize, "Your size is really size");
+        require(size <= maxSize, "Your size is too big");
         require(
-            (size / 10**2) + openInterest[isShort] <= maxOpenInterest,
+            size + openInterest[isShort] <= maxOpenInterest,
             "OI is too high"
         );
 
-        openInterest[isShort] += size / 10**2;
+        openInterest[isShort] += size;
 
         uint256 markPrice = getMarkPrice();
 
@@ -583,6 +583,14 @@ contract OptionScalp is Ownable, Pausable {
         price = uint256(priceOracle.getUnderlyingPrice());
     }
 
+    /// @notice Owner-only function to update maxSize and maxOpenInterest
+    /// @param newMaxSize ie8
+    /// @param newMaxOpenInterest ie8
+    function updateConfig(uint256 newMaxSize, uint256 newMaxOpenInterest) onlyOwner public {
+        maxSize = newMaxSize;
+        maxOpenInterest = newMaxOpenInterest;
+    }
+
     function checkMath() public view {
         console.log("QUOTE");
         console.log(quote.balanceOf(address(this)));
@@ -597,13 +605,5 @@ contract OptionScalp is Ownable, Pausable {
         console.log(baseLp.totalAssets());
         console.log("BASE TOTAL AVAILABLE ASSETS");
         console.log(baseLp.totalAvailableAssets());
-    }
-
-    function max(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a >= b ? a : b;
-    }
-
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a <= b ? a : b;
     }
 }
