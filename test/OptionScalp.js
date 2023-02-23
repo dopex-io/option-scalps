@@ -202,18 +202,20 @@ describe("Option scalp", function() {
     // price drops from 1285.67 to 1253.53 = $32.14
     // size was $5000 so positions is 5000 / 1285.55 = 3.88, expected profit is 3.88 * 32.14 = $124.70
 
+    expect((await optionScalp.isLiquidatable(0))).to.eq(false);
+
     await optionScalp.connect(user1).closePosition(0);
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('10092117978');
+    expect(quoteBalance).to.eq('10091978397');
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
     // $124.70 - 25$ of premium - 2.5$ of fees = $97.2
     // it is slightly different because we move the price too when we enter and close the position
     // so 1285 and 1253 are not exactly our correct entry and exit price
-    expect(profit).to.eq("92117978"); // $92.11
+    expect(profit).to.eq("91978397"); // $91.97
 
     // check if math is 100% correct
     await optionScalp.checkMath();
@@ -221,16 +223,16 @@ describe("Option scalp", function() {
 
   it("user 1 opens a short scalp position, eth pumps, position is closed", async function() {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10092117978');
+    expect(startQuoteBalance).to.eq('10091978397');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "80000000"); // 5000$ short
+    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "500000000"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9984617978');
+    expect(quoteBalance).to.eq('9564478397');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
-    expect(amountPaid).to.eq("107500000"); // 80$ of margin + 25$ of premium + 2.5$ of fees
+    expect(amountPaid).to.eq("527500000"); // 500$ of margin + 25$ of premium + 2.5$ of fees
 
     const b50UsdcBalance = await usdc.balanceOf(b50Address);
     await usdc.connect(b50).approve(uniV3Router.address, b50UsdcBalance);
@@ -250,7 +252,7 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("125353162600"); // $1253.53
+    expect(actualPrice).to.eq("125353162800"); // $1253.53
 
     await uniV3Router.connect(b50).exactInputSingle(
         {
@@ -278,23 +280,27 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("126099007000"); // $1260.99
+    expect(actualPrice).to.eq("126099007200"); // $1260.99
+
+    await priceOracle.updateUnderlyingPrice("126099007200");
 
     // price pumps from 1253.53 to 1260.99 = -$7.46
-    // size was $5000 so positions is 5000 / 1253.81 = 3.98, expected profit is 3.98 * -7.46 = -$29.69
+    // size was $5000 so positions is 5000 / 1253.53 = 3.98873581, expected profit is 3.98873581 * -7.46 = -$29.75
+
+    expect((await optionScalp.isLiquidatable(1))).to.eq(false);
 
     await optionScalp.connect(user1).closePosition(1);
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('10029791528');
+    expect(quoteBalance).to.eq('10029186890');
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
-    // - $29.69 of pnl - 25$ of premium - 2.5$ of fees = $57.19
+    // - $30 of pnl - 25$ of premium - 2.5$ of fees = $57.5
     // it is slightly different because we move the price too when we enter and close the position
     // so 1253.81 and 1260.99 are not exactly our correct entry and exit price
-    expect(profit).to.eq("-62326450"); // $62.32
+    expect(profit).to.eq("-62791507"); // $62.79
 
     // check if math is 100% correct
     await optionScalp.checkMath();
@@ -302,7 +308,7 @@ describe("Option scalp", function() {
 
   it("user 1 opens a long scalp position, eth pumps, position is closed", async function() {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10029791528');
+    expect(startQuoteBalance).to.eq('10029186890');
 
     let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
         {
@@ -317,10 +323,10 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("126114885500"); // $1261.14
+    expect(actualPrice).to.eq("126114886400"); // $1261.14
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "90000000");
+    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "500000000");
 
     await usdc.connect(bf5).approve(uniV3Router.address, "1500000000000");
 
@@ -350,7 +356,9 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("130563344000"); // $1305.63
+    expect(actualPrice).to.eq("130563345200"); // $1305.63
+
+    await priceOracle.updateUnderlyingPrice("130563344300");
 
     // price pumps from 1261.14 to 1305.63 = -$44.49
     // size was $5000 so positions is 5000 / 1261.14 = 3.96, expected profit is 3.96 * 44.49 = $176.18
@@ -358,14 +366,14 @@ describe("Option scalp", function() {
     await optionScalp.connect(user1).closePosition(2);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('10172793287');
+    expect(quoteBalance).to.eq('10177349876');
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
     // $176.18 of pnl - 25$ of premium - 2.5$ of fees = $148.68
     // it is slightly different because we move the price too when we enter and close the position
     // so 1261.14 and 1305.63 are not exactly our correct entry and exit price
-    expect(profit).to.eq("143001759"); // $143.00
+    expect(profit).to.eq("148162986"); // $148.16
 
     // check if math is 100% correct
     await optionScalp.checkMath();
@@ -373,7 +381,7 @@ describe("Option scalp", function() {
 
   it("user 1 opens a long scalp position, eth drops, position is closed", async function() {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10172793287');
+    expect(startQuoteBalance).to.eq('10177349876');
 
     let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
         {
@@ -388,10 +396,10 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("130543298700"); // $1305.43
+    expect(actualPrice).to.eq("130543299900"); // $1305.43
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "150000000");
+    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "2500000000");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("900.0"));
 
@@ -423,7 +431,9 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("127574029000"); // $1275.74
+    expect(actualPrice).to.eq("127574029900"); // $1275.74
+
+    await priceOracle.updateUnderlyingPrice("127574029900");
 
     // price pumps from 1305.43 to 1275.74 = -$29.69
     // size was $5000 so positions is 5000 / 1305.43 = 3.83, expected profit is 3.83 * -29.69 = -$113.71
@@ -431,14 +441,14 @@ describe("Option scalp", function() {
     await optionScalp.connect(user1).closePosition(3);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('10026022794');
+    expect(quoteBalance).to.eq('10036438021');
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
     // - $113.71 of pnl - 25$ of premium - 2.5$ of fees = - $141.21
     // it is slightly different because we move the price too when we enter and close the position
     // so 1261.14 and 1305.63 are not exactly our correct entry and exit price
-    expect(profit).to.eq("-146770493"); // $146.77
+    expect(profit).to.eq("-140911855"); // $140.91
 
     // check if math is 100% correct
     await optionScalp.checkMath();
@@ -446,16 +456,16 @@ describe("Option scalp", function() {
 
   it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is enough", async function() {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10026022794');
+    expect(startQuoteBalance).to.eq('10036438021');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "32000000"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9966522794');
+    expect(quoteBalance).to.eq('9982341557');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
-    expect(amountPaid).to.eq("59500000"); // 32$ of margin + 25$ of premium + 2.5$ of fees
+    expect(amountPaid).to.eq("54096464"); // 32$ of margin + 19.59$ of premium + 2.5$ of fees
 
     const b50UsdcBalance = await usdc.balanceOf(b50Address);
     await usdc.connect(b50).approve(uniV3Router.address, b50UsdcBalance);
