@@ -50,6 +50,7 @@ contract OptionScalp is Ownable, Pausable {
     IGmxHelper public gmxHelper;
 
     uint256[] public timeframes = [5 minutes, 15 minutes, 30 minutes];
+    uint256 public expiryWindow = 60 seconds;
 
     // Address of multisig which handles insurance fund
     address public insuranceFund;
@@ -70,7 +71,7 @@ contract OptionScalp is Ownable, Pausable {
     uint256 public maxSize = 100000e8; // $100k
 
     // Max open interest (ie6)
-    uint256 public maxOpenInterest = 10000000e8; // $10M
+    uint256 public maxOpenInterest = 10000000e6; // $10M
 
     // Open interest (ie6)
     mapping(bool => uint256) public openInterest;
@@ -255,9 +256,12 @@ contract OptionScalp is Ownable, Pausable {
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
         require(size <= maxSize, "Your size is really size");
-        require((size / 10 ** 2) + openInterest[isShort] <= maxOpenInterest, "OI is too high");
+        require(
+            (size / 10**2) + openInterest[isShort] <= maxOpenInterest,
+            "OI is too high"
+        );
 
-        openInterest[isShort] += size / 10 ** 2;
+        openInterest[isShort] += size / 10**2;
 
         uint256 markPrice = getMarkPrice();
 
@@ -272,10 +276,14 @@ contract OptionScalp is Ownable, Pausable {
         console.log(premium);
 
         // Calculate opening fees in quote
-        uint256 openingFees = calcFees(size / 10 ** 2);
+        uint256 openingFees = calcFees(size / 10**2);
 
         // We transfer margin + premium + fees from user
-        quote.transferFrom(msg.sender, address(this), margin + premium + openingFees);
+        quote.transferFrom(
+            msg.sender,
+            address(this),
+            margin + premium + openingFees
+        );
 
         uint256 swapped;
         uint256 entry;
@@ -285,26 +293,31 @@ contract OptionScalp is Ownable, Pausable {
             swapped = _swapExactOut(
                 address(base),
                 address(quote),
-                size / 10 ** 2
+                size / 10**2
             );
 
             // size is ie8, swapped is ie18
             // 1e18 * ie8 / ie18 = ie8
-            entry = (10 ** 18) * size / swapped;
+            entry = ((10**18) * size) / swapped;
 
-            require(baseLp.totalAvailableAssets() >= swapped, "Insufficient liquidity");
+            require(
+                baseLp.totalAvailableAssets() >= swapped,
+                "Insufficient liquidity"
+            );
 
             baseLp.lockLiquidity(swapped);
         } else {
-
             // quote to base
-            require(quoteLp.totalAvailableAssets() >= size / 10 ** 2, "Insufficient liquidity");
+            require(
+                quoteLp.totalAvailableAssets() >= size / 10**2,
+                "Insufficient liquidity"
+            );
 
-            swapped = _swapExactIn(address(quote), address(base), size / 10 ** 2);
+            swapped = _swapExactIn(address(quote), address(base), size / 10**2);
 
             // size is ie8, swapped is ie18
             // 1e18 * ie8 / ie18 = ie8
-            entry = (10 ** 18) * size / swapped;
+            entry = ((10**18) * size) / swapped;
 
             quoteLp.lockLiquidity(size / 10**2);
         }
@@ -355,81 +368,83 @@ contract OptionScalp is Ownable, Pausable {
     /// @param id ID of position
     function closePosition(uint256 id) public {
         require(scalpPositions[id].isOpen, "Invalid position ID");
-
-        require(
-            IERC721(scalpPositionMinter).ownerOf(id) == msg.sender ||
-                scalpPositions[id].openedAt + scalpPositions[id].timeframe >=
-                block.timestamp,
-            "Sender must be position owner or position must be expired"
-        );
+        if (IERC721(scalpPositionMinter).ownerOf(id) == msg.sender) {
+            require(
+                block.timestamp <=
+                    scalpPositions[id].openedAt + scalpPositions[id].timeframe,
+                "The owner must close position before expiry"
+            );
+        } else {
+            require(
+                block.timestamp + expiryWindow >=
+                    scalpPositions[id].openedAt + scalpPositions[id].timeframe,
+                "Keeper can only close from an window before expiry"
+            );
+        }
 
         uint256 swapped;
         uint256 price;
-
-        int256 actualPnl;
+        uint256 traderWithdraw;
 
         if (scalpPositions[id].isShort) {
             // quote to base
-            swapped = _swapExactOut(
+            swapped = _swapExactIn(
                 address(quote),
                 address(base),
-                scalpPositions[id].amountBorrowed
+                scalpPositions[id].amountOut + scalpPositions[id].margin
             );
 
-            // amountBorrowed is ie18, swapped is ie6
-            // 1e20 * ie6 / ie18 = ie8
-            price = (10 ** 20) * swapped / scalpPositions[id].amountBorrowed;
+            if (swapped > scalpPositions[id].amountBorrowed) {
+                baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
-            actualPnl = calcActualPnl(id, price);
+                //convert remaining base to quote to pay for trader
+                traderWithdraw = _swapExactIn(
+                    address(base),
+                    address(quote),
+                    swapped - scalpPositions[id].amountBorrowed
+                );
 
-            baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
+                quote.transfer(
+                    IERC721(scalpPositionMinter).ownerOf(id),
+                    traderWithdraw
+                );
+            } else {
+                baseLp.unlockLiquidity(swapped);
+            }
         } else {
             // base to quote
-            swapped = _swapExactOut(
+            swapped = _swapExactIn(
                 address(base),
                 address(quote),
+                scalpPositions[id].amountOut
+            );
+
+            if (
+                scalpPositions[id].margin + swapped >
                 scalpPositions[id].amountBorrowed
-            );
+            ) {
+                quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
-            // amountBorrowed is ie6, swapped is ie18
-            // 1e20 * ie6 / ie18 = ie8
-            price = (10 ** 20) * scalpPositions[id].amountBorrowed / swapped;
+                traderWithdraw =
+                    scalpPositions[id].margin +
+                    swapped -
+                    scalpPositions[id].amountBorrowed;
 
-            actualPnl = calcActualPnl(id, price);
-
-            quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
+                quote.transfer(
+                    IERC721(scalpPositionMinter).ownerOf(id),
+                    traderWithdraw
+                );
+            } else {
+                quoteLp.unlockLiquidity(scalpPositions[id].margin + swapped);
+            }
         }
 
-        // Check margin is enough to cover pnl
-        require(int256(scalpPositions[id].margin) + actualPnl >= 0,
-            "Insufficient margin to cover negative PnL, premium and fees"
-        );
-
-        quote.transfer(
-            IERC721(scalpPositionMinter).ownerOf(id),
-            uint256(int256(scalpPositions[id].margin) + actualPnl)
-        );
-
-        if (actualPnl < 0 && !scalpPositions[id].isShort) {
-            // if we had to swap more base than amountOut to cover the loan and we use a part of user margin for it
-            // we need to swap that part of margin to base
-            _swapExactIn(
-                address(quote),
-                address(base),
-                uint(actualPnl * -1)
-            );
-        } else if (actualPnl > 0 && !scalpPositions[id].isShort){
-            // we need to swap base to quote to cover the pnl sent to the user
-            _swapExactOut(
-                address(base),
-                address(quote),
-                uint(actualPnl)
-            );
-        }
-
+        openInterest[scalpPositions[id].isShort] -=
+            scalpPositions[id].size /
+            10**2;
         scalpPositions[id].isOpen = false;
 
-        emit ClosePosition(id, actualPnl, msg.sender);
+        emit ClosePosition(id, int256(traderWithdraw), msg.sender);
     }
 
     /// @notice Liquidates an underCollateralized open position, all funds go to LPs
@@ -452,7 +467,7 @@ contract OptionScalp is Ownable, Pausable {
 
             // amountOut is ie6, swapped is ie18
             // 1e20 * ie6 / ie18 = ie8
-            price = (10 ** 20) * scalpPositions[id].amountOut / swapped;
+            price = ((10**20) * scalpPositions[id].amountOut) / swapped;
 
             pnl = calcActualPnl(id, price);
 
@@ -475,7 +490,12 @@ contract OptionScalp is Ownable, Pausable {
 
                     // that liquidity does not exist anymore so we don't need to keep it locked
                     baseLp.unlockLiquidity(
-                        min(baseLp._lockedLiquidity(), scalpPositions[id].amountBorrowed - swapped - obtained)
+                        min(
+                            baseLp._lockedLiquidity(),
+                            scalpPositions[id].amountBorrowed -
+                                swapped -
+                                obtained
+                        )
                     );
                 } else {
                     console.log("NO LP LOSS");
@@ -503,7 +523,7 @@ contract OptionScalp is Ownable, Pausable {
 
             // amountOut is ie6, swapped is ie18
             // 1e20 * ie6 / ie18 = ie8
-            price = (10 ** 20) * swapped / scalpPositions[id].amountOut;
+            price = ((10**20) * swapped) / scalpPositions[id].amountOut;
 
             pnl = calcActualPnl(id, price);
 
@@ -522,7 +542,12 @@ contract OptionScalp is Ownable, Pausable {
 
                     // that liquidity does not exist anymore so we don't need to keep it locked
                     quoteLp.unlockLiquidity(
-                        min(quoteLp._lockedLiquidity(), scalpPositions[id].amountBorrowed - swapped - obtained)
+                        min(
+                            quoteLp._lockedLiquidity(),
+                            scalpPositions[id].amountBorrowed -
+                                swapped -
+                                obtained
+                        )
                     );
                 } else {
                     console.log("NO LP LOSS");
@@ -548,9 +573,11 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Returns whether an open position is liquidatable
     function isLiquidatable(uint256 id) public view returns (bool) {
-        return int256(scalpPositions[id].margin) + calcPnl(id) <=
-            int256(minimumAbsoluteLiquidationThreshold) *
-                int256(scalpPositions[id].positions) / 10 ** 8;
+        return
+            int256(scalpPositions[id].margin) + calcPnl(id) <=
+            (int256(minimumAbsoluteLiquidationThreshold) *
+                int256(scalpPositions[id].positions)) /
+                10**8;
     }
 
     /// @notice Allow only scalp LP contract to claim collateral
@@ -606,29 +633,36 @@ contract OptionScalp is Ownable, Pausable {
     /// @notice Internal function to calculate pnl
     /// @param id ID of position
     function calcPnl(uint256 id) internal view returns (int256 pnl) {
-
         uint256 markPrice = getMarkPrice();
         if (scalpPositions[id].isShort)
-            pnl = int256(scalpPositions[id].positions) *
-                (int256(scalpPositions[id].entry) - int256(markPrice)) /
+            pnl =
+                (int256(scalpPositions[id].positions) *
+                    (int256(scalpPositions[id].entry) - int256(markPrice))) /
                 10**8;
         else
-            pnl = int256(scalpPositions[id].positions) *
-                (int256(markPrice) - int256(scalpPositions[id].entry)) /
+            pnl =
+                (int256(scalpPositions[id].positions) *
+                    (int256(markPrice) - int256(scalpPositions[id].entry))) /
                 10**8;
     }
 
     /// @notice Internal function to calculate actual pnl
     /// @param id ID of position
     /// @param pnl computed using actual price ie6
-    function calcActualPnl(uint256 id, uint256 actualPrice) internal view returns (int256 pnl) {
+    function calcActualPnl(uint256 id, uint256 actualPrice)
+        internal
+        view
+        returns (int256 pnl)
+    {
         if (scalpPositions[id].isShort)
-            pnl = int256(scalpPositions[id].positions) *
-                (int256(scalpPositions[id].entry) - int256(actualPrice)) /
+            pnl =
+                (int256(scalpPositions[id].positions) *
+                    (int256(scalpPositions[id].entry) - int256(actualPrice))) /
                 10**10;
         else
-            pnl = int256(scalpPositions[id].positions) *
-                (int256(actualPrice) - int256(scalpPositions[id].entry)) /
+            pnl =
+                (int256(scalpPositions[id].positions) *
+                    (int256(actualPrice) - int256(scalpPositions[id].entry))) /
                 10**10;
     }
 
