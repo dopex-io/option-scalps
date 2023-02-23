@@ -441,9 +441,7 @@ contract OptionScalp is Ownable, Pausable {
             }
         }
 
-        openInterest[scalpPositions[id].isShort] -=
-            scalpPositions[id].size /
-            10**2;
+        openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
         scalpPositions[id].isOpen = false;
 
         emit ClosePosition(id, int256(traderWithdraw), msg.sender);
