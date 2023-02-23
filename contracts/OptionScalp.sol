@@ -20,7 +20,6 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
-import "hardhat/console.sol";
 
 contract OptionScalp is Ownable, Pausable {
     using SafeERC20 for IERC20;
@@ -247,7 +246,7 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Opens a position against/in favour of the base asset (if you short base is swapped to quote)
     /// @param size Size is ie8
-    /// @param timeFrameIndex Position of the array
+    /// @param timeframeIndex Position of the array
     /// @param margin Collateral posted by user
     function openPosition(
         bool isShort,

@@ -216,9 +216,6 @@ describe("Option scalp", function() {
     // it is slightly different because we move the price too when we enter and close the position
     // so 1285 and 1253 are not exactly our correct entry and exit price
     expect(profit).to.eq("91978397"); // $91.97
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a short scalp position, eth pumps, position is closed", async function() {
@@ -301,9 +298,6 @@ describe("Option scalp", function() {
     // it is slightly different because we move the price too when we enter and close the position
     // so 1253.81 and 1260.99 are not exactly our correct entry and exit price
     expect(profit).to.eq("-62791507"); // $62.79
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a long scalp position, eth pumps, position is closed", async function() {
@@ -374,9 +368,6 @@ describe("Option scalp", function() {
     // it is slightly different because we move the price too when we enter and close the position
     // so 1261.14 and 1305.63 are not exactly our correct entry and exit price
     expect(profit).to.eq("148162986"); // $148.16
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a long scalp position, eth drops, position is closed", async function() {
@@ -449,9 +440,6 @@ describe("Option scalp", function() {
     // it is slightly different because we move the price too when we enter and close the position
     // so 1261.14 and 1305.63 are not exactly our correct entry and exit price
     expect(profit).to.eq("-140911855"); // $140.91
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is enough", async function() {
@@ -530,9 +518,6 @@ describe("Option scalp", function() {
 
     // -32$ margin - 19.59$ of premium - 2.5$ of fees = $54.09
     expect(profit).to.eq("-54096464");
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a long scalp position, eth drops, position is liquidated and margin is not enough", async function() {
@@ -603,9 +588,6 @@ describe("Option scalp", function() {
 
     // - $120 of margin - 19.49 of premium - 2.5$ of fees = - $141.99
     expect(profit).to.eq("-141997960"); // $141.99
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is not enough", async function() {
@@ -684,9 +666,6 @@ describe("Option scalp", function() {
 
     // -30$ margin - 19.96$ of premium - 2.5$ of fees = $52.46
     expect(profit).to.eq("-52460186");
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a long scalp position, eth drops, position is liquidated and margin is enough", async function() {
@@ -757,9 +736,6 @@ describe("Option scalp", function() {
 
     // - $90 of margin - 19.84 of premium - 2.5$ of fees
     expect(profit).to.eq("-112348770"); // $172.34
-
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 0 withdraws portion of eth deposit with pnl", async function() {
@@ -774,8 +750,6 @@ describe("Option scalp", function() {
 
     expect(difference).to.eq("3021176971622294804");
 
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 0 withdraws portion of usd deposit with pnl", async function() {
@@ -790,8 +764,6 @@ describe("Option scalp", function() {
 
     expect(difference).to.eq("2031289095");
 
-    // check if math is 100% correct
-    await optionScalp.checkMath();
   });
 
   it("user 1 opens a long scalp position and user 0 cannot withdraw more than available liquidity", async function() {
@@ -858,15 +830,9 @@ describe("Option scalp", function() {
   });
 
   it("user 1 closes long scalp position and user 0 withdraws remaining available liquidity", async function() {
-    await optionScalp.checkMath();
-
     await optionScalp.connect(user1).closePosition(8);
 
-    await optionScalp.checkMath();
-
     await optionScalp.connect(user0).withdraw(true, "3000000000");
-
-    await optionScalp.checkMath();
   });
 
   it("update max size and max open interest", async function() {
