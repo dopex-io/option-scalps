@@ -818,8 +818,6 @@ describe("Option scalp", function() {
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
 
-    console.log("Test");
-
     await uniV3Router.connect(b50).exactInputSingle(
         {
           tokenIn: weth.address,

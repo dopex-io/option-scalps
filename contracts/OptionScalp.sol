@@ -245,8 +245,10 @@ contract OptionScalp is Ownable, Pausable {
         emit Withdraw(isQuote, amount, msg.sender);
     }
 
-    /// @notice Opens a position against/in favour of the base asset
-    /// If you short base is swapped to quote
+    /// @notice Opens a position against/in favour of the base asset (if you short base is swapped to quote)
+    /// @param size Size is ie8
+    /// @param timeFrameIndex Position of the array
+    /// @param margin Collateral posted by user
     function openPosition(
         bool isShort,
         uint256 size,
@@ -271,9 +273,6 @@ contract OptionScalp is Ownable, Pausable {
             size,
             timeframes[timeframeIndex]
         );
-
-        console.log("Premium");
-        console.log(premium);
 
         // Calculate opening fees in quote
         uint256 openingFees = calcFees(size / 10**2);
@@ -449,26 +448,9 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Returns whether an open position is liquidatable
     function isLiquidatable(uint256 id) public view returns (bool) {
-
-        console.log("MARGIN");
-        console.log(scalpPositions[id].margin);
-        console.log("PNL");
-        console.logInt(calcPnl(id));
-        console.log("MINIMUM");
-        console.logInt((int256(minimumAbsoluteLiquidationThreshold) *
-                int256(scalpPositions[id].positions)) /
-                10**8);
-
-        bool flag =
-            int256(scalpPositions[id].margin) + calcPnl(id) <=
+        return int256(scalpPositions[id].margin) + calcPnl(id) <=
             (int256(minimumAbsoluteLiquidationThreshold) *
-                int256(scalpPositions[id].positions)) /
-                10**8;
-
-        console.log("IS LIQUIDATABLE?");
-        console.log(flag);
-
-        return flag;
+                int256(scalpPositions[id].positions)) / 10**8;
     }
 
     /// @notice Allow only scalp LP contract to claim collateral
@@ -523,22 +505,9 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Internal function to calculate pnl
     /// @param id ID of position
+    /// @dev positions is ie8, entry is ie8, markPrice is ie8, pnl is ie6
     function calcPnl(uint256 id) internal view returns (int256 pnl) {
         uint256 markPrice = getMarkPrice();
-
-        console.log("MARK PRICE");
-        console.log(markPrice);
-
-        console.log("ENTRY");
-        console.logInt(int256(scalpPositions[id].entry));
-
-        console.log("POSITIONS");
-        console.log(scalpPositions[id].positions);
-
-        // positions is ie8
-        // entry is ie8
-        // markPrice is ie8
-        // pnl is ie6
 
         if (scalpPositions[id].isShort)
             pnl =
@@ -550,9 +519,6 @@ contract OptionScalp is Ownable, Pausable {
                 (int256(scalpPositions[id].positions) *
                     (int256(markPrice) - int256(scalpPositions[id].entry))) /
                 10**10;
-
-        console.log("PNL");
-        console.logInt(pnl);
     }
 
     /// @notice Internal function to calculate actual pnl
@@ -587,21 +553,5 @@ contract OptionScalp is Ownable, Pausable {
     function updateConfig(uint256 newMaxSize, uint256 newMaxOpenInterest) onlyOwner public {
         maxSize = newMaxSize;
         maxOpenInterest = newMaxOpenInterest;
-    }
-
-    function checkMath() public view {
-        console.log("QUOTE");
-        console.log(quote.balanceOf(address(this)));
-        console.log("QUOTE TOTAL ASSETS");
-        console.log(quoteLp.totalAssets());
-        console.log("QUOTE TOTAL AVAILABLE ASSETS");
-        console.log(quoteLp.totalAvailableAssets());
-
-        console.log("BASE");
-        console.log(base.balanceOf(address(this)));
-        console.log("BASE TOTAL ASSETS");
-        console.log(baseLp.totalAssets());
-        console.log("BASE TOTAL AVAILABLE ASSETS");
-        console.log(baseLp.totalAvailableAssets());
     }
 }
