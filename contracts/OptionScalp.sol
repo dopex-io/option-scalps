@@ -452,6 +452,18 @@ contract OptionScalp is Ownable, Pausable {
                 int256(scalpPositions[id].positions)) / 10**8;
     }
 
+    /// @notice Get liquidation price
+    /// @param id Identifier of the position
+    function getLiquidationPrice(uint256 id) public view returns (uint256 price) {
+        int256 threshold = int256(scalpPositions[id].margin) - (int256(minimumAbsoluteLiquidationThreshold) * int256(scalpPositions[id].positions)) / 10**8;
+
+        if (scalpPositions[id].isShort) {
+          price = (divisor * (scalpPositions[id].size) / scalpPositions[id].positions) + (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
+        } else {
+          price = (divisor * (scalpPositions[id].size) / scalpPositions[id].positions) - (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
+        }
+    }
+
     /// @notice Allow only scalp LP contract to claim collateral
     /// @param amount Amount of quote/base assets to transfer
     function claimCollateral(uint256 amount) public {

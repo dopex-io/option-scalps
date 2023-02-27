@@ -725,6 +725,8 @@ describe("Option scalp", function() {
     // price pumps from 1259.68 to 1241.68 = -$18
     // size was $5000 so positions is 5000 / 1259.68 = 3.96, expected profit is 3.96 * -18 = -$71.28
 
+    expect((await optionScalp.getLiquidationPrice(7))).to.eq("124334299918");
+
     await priceOracle.updateUnderlyingPrice("124168720400");
 
     await optionScalp.closePosition(7);
@@ -787,6 +789,8 @@ describe("Option scalp", function() {
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(false, "100000000000", 0, "150000000");
+
+    expect(await optionScalp.getLiquidationPrice(8)).to.eq("106139930602");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
 
