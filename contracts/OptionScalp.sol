@@ -383,7 +383,6 @@ contract OptionScalp is Ownable, Pausable {
         }
 
         uint256 swapped;
-        uint256 price;
         uint256 traderWithdraw;
 
         if (scalpPositions[id].isShort) {
