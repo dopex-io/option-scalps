@@ -489,7 +489,7 @@ contract OptionScalp is Ownable, Pausable {
         uint256 strike,
         uint256 size,
         uint256 timeToExpiry
-    ) internal view returns (uint256 premium) {
+    ) public view returns (uint256 premium) {
         uint256 expiry = block.timestamp + timeToExpiry;
         premium = ((uint256(
             optionPricing.getOptionPrice(
@@ -506,14 +506,14 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Internal function to calculate fees
     /// @param amount Value of option in USD (ie6)
-    function calcFees(uint256 amount) internal view returns (uint256 fees) {
+    function calcFees(uint256 amount) public view returns (uint256 fees) {
         fees = (amount * feeOpenPosition) / (100 * divisor);
     }
 
     /// @notice Internal function to calculate pnl
     /// @param id ID of position
     /// @dev positions is ie8, entry is ie8, markPrice is ie8, pnl is ie6
-    function calcPnl(uint256 id) internal view returns (int256 pnl) {
+    function calcPnl(uint256 id) public view returns (int256 pnl) {
         uint256 markPrice = getMarkPrice();
 
         if (scalpPositions[id].isShort)
@@ -525,26 +525,6 @@ contract OptionScalp is Ownable, Pausable {
             pnl =
                 (int256(scalpPositions[id].positions) *
                     (int256(markPrice) - int256(scalpPositions[id].entry))) /
-                10**10;
-    }
-
-    /// @notice Internal function to calculate actual pnl
-    /// @param id ID of position
-    /// @param pnl computed using actual price ie6
-    function calcActualPnl(uint256 id, uint256 actualPrice)
-        internal
-        view
-        returns (int256 pnl)
-    {
-        if (scalpPositions[id].isShort)
-            pnl =
-                (int256(scalpPositions[id].positions) *
-                    (int256(scalpPositions[id].entry) - int256(actualPrice))) /
-                10**10;
-        else
-            pnl =
-                (int256(scalpPositions[id].positions) *
-                    (int256(actualPrice) - int256(scalpPositions[id].entry))) /
                 10**10;
     }
 
