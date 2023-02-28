@@ -216,13 +216,13 @@ contract OptionScalp is Ownable, Pausable {
     // Deposit assets
     // @param isQuote If true user deposits quote token (else base)
     // @param amount Amount of quote asset to deposit to LP
-    function deposit(bool isQuote, uint256 amount) public {
+    function deposit(bool isQuote, uint256 amount) public returns (uint256 shares) {
         if (isQuote) {
             quote.transferFrom(msg.sender, address(this), amount);
-            quoteLp.deposit(amount, msg.sender);
+            shares = quoteLp.deposit(amount, msg.sender);
         } else {
             base.transferFrom(msg.sender, address(this), amount);
-            baseLp.deposit(amount, msg.sender);
+            shares = baseLp.deposit(amount, msg.sender);
         }
 
         emit Deposit(isQuote, amount, msg.sender);
@@ -231,14 +231,16 @@ contract OptionScalp is Ownable, Pausable {
     // Withdraw
     // @param isQuote If true user withdraws quote token (else base)
     // @param amount Amount of LP positions to withdraw
-    function withdraw(bool isQuote, uint256 amount) public {
+    function withdraw(bool isQuote, uint256 amount) public returns (uint256 assets) {
         if (isQuote) {
-            quoteLp.redeem(amount, msg.sender, msg.sender);
+            assets = quoteLp.redeem(amount, msg.sender, msg.sender);
         } else {
-            baseLp.redeem(amount, msg.sender, msg.sender);
+            assets = baseLp.redeem(amount, msg.sender, msg.sender);
         }
 
         emit Withdraw(isQuote, amount, msg.sender);
+
+        return assets;
     }
 
     /// @notice Opens a position against/in favour of the base asset (if you short base is swapped to quote)
