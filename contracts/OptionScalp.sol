@@ -557,6 +557,27 @@ contract OptionScalp is Ownable, Pausable {
         price = uint256(priceOracle.getUnderlyingPrice());
     }
 
+    /// @notice Returns the tokenIds owned by a wallet
+    /// @param owner wallet owner
+    function positionsOfOwner(address owner)
+        public
+        view
+        returns (uint256[] memory tokenIds)
+    {
+      uint256 ownerTokenCount = scalpPositionMinter.balanceOf(owner);
+
+      tokenIds = new uint256[](ownerTokenCount);
+      uint256 start;
+      uint256 idx;
+
+      while (start < ownerTokenCount) {
+          uint256 tokenId = scalpPositionMinter.tokenOfOwnerByIndex(owner, idx);
+          tokenIds[start] = tokenId;
+          ++start;
+          ++idx;
+      }
+  }
+
     /// @notice Owner-only function to update maxSize and maxOpenInterest
     /// @param newMaxSize ie8
     /// @param newMaxOpenInterest ie8

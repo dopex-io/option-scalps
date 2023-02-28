@@ -851,4 +851,9 @@ describe("Option scalp", function() {
       await optionScalp.connect(user1).openPosition(true, "800000000000", 0, "150000000");
       await expect(optionScalp.connect(user1).openPosition(true, "800000000000", 0, "150000000")).to.be.revertedWith("OI is too high");
   });
+
+  it("get positions of user 1", async function() {
+      const positions = await optionScalp.connect(user1).positionsOfOwner(user1.address);
+      expect(positions[2]).to.eq(2);
+  });
 });
