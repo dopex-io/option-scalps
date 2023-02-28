@@ -457,9 +457,9 @@ contract OptionScalp is Ownable, Pausable {
         int256 threshold = int256(scalpPositions[id].margin) - (int256(minimumAbsoluteLiquidationThreshold) * int256(scalpPositions[id].positions)) / 10**8;
 
         if (scalpPositions[id].isShort) {
-          price = (divisor * (scalpPositions[id].size) / scalpPositions[id].positions) + (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
+          price = scalpPositions[id].entry + (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
         } else {
-          price = (divisor * (scalpPositions[id].size) / scalpPositions[id].positions) - (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
+          price = scalpPositions[id].entry - (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
         }
     }
 
