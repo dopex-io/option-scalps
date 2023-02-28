@@ -60,9 +60,6 @@ contract OptionScalp is Ownable, Pausable {
     // Fees for opening position
     uint256 public feeOpenPosition = 5000000; // 0.05%
 
-    // Percentage threshold above (entry - margin) when liquidate() is callable
-    uint256 public liquidationThresholdPercentage = 2500000; // 0.025%
-
     // Minimum absolute threshold in quote asset above (entry - margin) when liquidate() is callable
     uint256 public minimumAbsoluteLiquidationThreshold = 5e6; // $5
 
