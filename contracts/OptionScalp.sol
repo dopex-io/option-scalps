@@ -124,6 +124,9 @@ contract OptionScalp is Ownable, Pausable {
     // Expire position event
     event ExpirePosition(uint256 id, int256 pnl, address indexed sender);
 
+    // Emergency withdraw
+    event EmergencyWithdraw(address indexed receiver);
+
     constructor(
         address _base,
         address _quote,
@@ -560,8 +563,29 @@ contract OptionScalp is Ownable, Pausable {
     /// @notice Owner-only function to update maxSize and maxOpenInterest
     /// @param newMaxSize ie8
     /// @param newMaxOpenInterest ie8
-    function updateConfig(uint256 newMaxSize, uint256 newMaxOpenInterest) onlyOwner public {
+    function updateConfig(uint256 newMaxSize, uint256 newMaxOpenInterest) onlyOwner external {
         maxSize = newMaxSize;
         maxOpenInterest = newMaxOpenInterest;
+    }
+
+    /// @notice Transfers all funds to msg.sender
+    /// @dev Can only be called by the owner
+    /// @param tokens The list of erc20 tokens to withdraw
+    /// @param transferNative Whether should transfer the native currency
+    function emergencyWithdraw(address[] calldata tokens, bool transferNative) external onlyOwner {
+        if (transferNative) payable(msg.sender).transfer(address(this).balance);
+
+        IERC20 token;
+
+        for (uint256 i; i < tokens.length; ) {
+            token = IERC20(tokens[i]);
+            token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        emit EmergencyWithdraw(msg.sender);
     }
 }

@@ -856,4 +856,34 @@ describe("Option scalp", function() {
       const positions = await optionScalp.connect(user1).positionsOfOwner(user1.address);
       expect(positions[2]).to.eq(2);
   });
+
+  it("pre emergency withdraw", async function() {
+      const usdcScalpBalance = await usdc.balanceOf(optionScalp.address);
+      const wethScalpBalance = await weth.balanceOf(optionScalp.address);
+      expect(usdcScalpBalance).to.eq("8159137748");
+      expect(wethScalpBalance).to.eq("636343371256635363");
+
+      const owner = await optionScalp.owner();
+
+      const usdcOwnerBalance = await usdc.balanceOf(owner);
+      const wethOwnerBalance = await weth.balanceOf(owner);
+      expect(usdcOwnerBalance).to.eq("0");
+      expect(wethOwnerBalance).to.eq("0");
+
+      await optionScalp.emergencyWithdraw([weth.address, usdc.address], false);
+  });
+
+  it("after emergency withdraw", async function() {
+      const usdcScalpBalance = await usdc.balanceOf(optionScalp.address);
+      const wethScalpBalance = await weth.balanceOf(optionScalp.address);
+      expect(usdcScalpBalance).to.eq("0");
+      expect(wethScalpBalance).to.eq("0");
+
+      const owner = await optionScalp.owner();
+
+      const usdcOwnerBalance = await usdc.balanceOf(owner);
+      const wethOwnerBalance = await weth.balanceOf(owner);
+      expect(usdcOwnerBalance).to.eq("8159137748");
+      expect(wethOwnerBalance).to.eq("636343371256635363");
+  });
 });
