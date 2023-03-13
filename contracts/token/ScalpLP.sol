@@ -40,23 +40,17 @@ contract ScalpLP is ERC4626 {
     /**
      * @param _scalp The address of the scalp contract creating the lp token
      * @param _collateral The address of the collateral asset in the scalp contract
-     * @param _underlyingSymbol The symbol of the underlying asset token
      * @param _collateralSymbol The symbol of the collateral asset token
      */
     constructor(
         address _scalp,
         address _collateral,
-        string memory _underlyingSymbol,
         string memory _collateralSymbol
     ) ERC4626(ERC20(_collateral), "Scalp LP Token", "ScLP") {
         scalp = OptionScalp(_scalp);
-        underlyingSymbol = _underlyingSymbol;
         collateralSymbol = _collateralSymbol;
 
-        string memory symbol = concatenate(_underlyingSymbol, "-");
-        symbol = concatenate(symbol, "-");
-        symbol = concatenate(symbol, _collateralSymbol);
-        symbol = concatenate(symbol, "-LP");
+        symbol = concatenate(_collateralSymbol, "-LP");
     }
 
     /*==== PURE FUNCTIONS ====*/
@@ -95,8 +89,13 @@ contract ScalpLP is ERC4626 {
     // Adds premium and fees to total available assets
     function addProceeds(uint proceeds) public {
         require(msg.sender == address(scalp), "Only scalp can call this function");
-        collateral.safeTransferFrom(msg.sender, address(this), proceeds);
         _totalAssets += proceeds;
+    }
+
+    // Subtract loss from total available assets
+    function subtractLoss(uint loss) public {
+        require(msg.sender == address(scalp), "Only scalp can call this function");
+        _totalAssets -= loss;
     }
 
     function beforeWithdraw(uint256 assets, uint256 /*shares*/ ) internal virtual override {
