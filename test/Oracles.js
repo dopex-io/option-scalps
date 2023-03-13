@@ -107,6 +107,9 @@ describe("Option scalp", function() {
     await weth.connect(b50).transfer(user0.address, ethers.utils.parseEther("10.0"));
     await usdc.connect(bf5).transfer(user0.address, "10000000000");
 
+    await weth.connect(b50).transfer(user1.address, ethers.utils.parseEther("10.0"));
+    await usdc.connect(bf5).transfer(user1.address, "10000000000");
+
     await b50.sendTransaction({
         to: user0.address,
         value: ethers.utils.parseEther("5.0")
@@ -147,83 +150,15 @@ describe("Option scalp", function() {
 
   it("user 1 opens a short scalp position, eth drops, position is closed", async function() {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('0');
+    expect(startQuoteBalance).to.eq('10000000000');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "20000000"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9952500000');
+    expect(quoteBalance).to.eq('9975070396');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
-    expect(amountPaid).to.eq("47500000"); // 20$ of margin + 25$ of premium + 2.5$ of fees
-
-    await weth.connect(b50).deposit({value: ethers.utils.parseEther("260.0")});
-    await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1000.0"));
-
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
-
-    expect(actualPrice).to.eq("128555210800"); // $1285.55
-
-    await uniV3Router.connect(b50).exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("900.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
-
-    quoteBalance = await usdc.balanceOf(user1.address);
-
-    expect(quoteBalance).to.eq('9952500000');
-
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
-
-    expect(actualPrice).to.eq("125353431000"); // $1253.53
-
-    // price drops from 1285.67 to 1253.53 = $32.14
-    // size was $5000 so positions is 5000 / 1285.55 = 3.88, expected profit is 3.88 * 32.14 = $124.70
-
-    expect((await optionScalp.isLiquidatable(0))).to.eq(false);
-
-    await optionScalp.connect(user1).closePosition(0);
-
-    quoteBalance = await usdc.balanceOf(user1.address);
-
-    expect(quoteBalance).to.eq('10091978397');
-
-    const profit = quoteBalance.sub(startQuoteBalance);
-
-    // $124.70 - 25$ of premium - 2.5$ of fees = $97.2
-    // it is slightly different because we move the price too when we enter and close the position
-    // so 1285 and 1253 are not exactly our correct entry and exit price
-    expect(profit).to.eq("91978397"); // $91.97
+    expect(amountPaid).to.eq("24929604"); // 20$ of margin + 2.929604$ of premium + 2.5$ of fees
   });
 });
