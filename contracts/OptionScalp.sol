@@ -261,11 +261,7 @@ contract OptionScalp is Ownable, Pausable {
 
         openInterest[isShort] += size;
 
-        console.log("test");
-
         uint256 markPrice = getMarkPrice();
-
-        console.log("test1");
 
         // Calculate premium for ATM option in quote
         uint256 premium = calcPremium(
@@ -490,7 +486,6 @@ contract OptionScalp is Ownable, Pausable {
         uint256 timeToExpiry
     ) public view returns (uint256 premium) {
         uint256 expiry = block.timestamp + timeToExpiry;
-        console.log('OPTION PRICING');
         premium = ((uint256(
             optionPricing.getOptionPrice(
                 false,
