@@ -48,8 +48,7 @@ contract OptionScalp is Ownable, Pausable {
     // GMX Helper
     IGmxHelper public gmxHelper;
 
-    uint256[] public timeframes = [5 minutes, 15 minutes, 30 minutes];
-    uint256 public expiryWindow = 60 seconds;
+    uint256[] public timeframes = [1 minutes, 5 minutes, 15 minutes, 30 minutes, 60 minutes];
 
     // Address of multisig which handles insurance fund
     address public insuranceFund;
@@ -117,12 +116,6 @@ contract OptionScalp is Ownable, Pausable {
 
     // Close position event
     event ClosePosition(uint256 id, int256 pnl, address indexed user);
-
-    // Liquidate position event
-    event LiquidatePosition(uint256 id, int256 pnl, address indexed liquidator);
-
-    // Expire position event
-    event ExpirePosition(uint256 id, int256 pnl, address indexed sender);
 
     // Emergency withdraw
     event EmergencyWithdraw(address indexed receiver);
@@ -368,21 +361,16 @@ contract OptionScalp is Ownable, Pausable {
     /// @param id ID of position
     function closePosition(uint256 id) public {
         require(scalpPositions[id].isOpen, "Invalid position ID");
+        require(scalpPositions[id].openedAt + 10 seconds <= block.timestamp,
+            "Position must be open for at least 10 seconds"
+        );
 
-        if (IERC721(scalpPositionMinter).ownerOf(id) == msg.sender) {
+        if (!isLiquidatable(id))
             require(
-                block.timestamp <=
+                block.timestamp >=
                     scalpPositions[id].openedAt + scalpPositions[id].timeframe,
-                "The owner must close position before expiry"
+                "Keeper can only close from an window before expiry"
             );
-        } else {
-            if (!isLiquidatable(id))
-                require(
-                    block.timestamp + expiryWindow >=
-                        scalpPositions[id].openedAt + scalpPositions[id].timeframe,
-                    "Keeper can only close from an window before expiry"
-                );
-        }
 
         uint256 swapped;
         uint256 traderWithdraw;
