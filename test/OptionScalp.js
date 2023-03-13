@@ -204,6 +204,8 @@ describe("Option scalp", function() {
 
     expect((await optionScalp.isLiquidatable(0))).to.eq(false);
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(0);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -286,6 +288,8 @@ describe("Option scalp", function() {
 
     expect((await optionScalp.isLiquidatable(1))).to.eq(false);
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(1);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -356,6 +360,8 @@ describe("Option scalp", function() {
 
     // price pumps from 1261.14 to 1305.63 = -$44.49
     // size was $5000 so positions is 5000 / 1261.14 = 3.96, expected profit is 3.96 * 44.49 = $176.18
+
+    await network.provider.send("evm_increaseTime", [10]);
 
     await optionScalp.connect(user1).closePosition(2);
 
@@ -428,6 +434,8 @@ describe("Option scalp", function() {
 
     // price pumps from 1305.43 to 1275.74 = -$29.69
     // size was $5000 so positions is 5000 / 1305.43 = 3.83, expected profit is 3.83 * -29.69 = -$113.71
+
+    await network.provider.send("evm_increaseTime", [10]);
 
     await optionScalp.connect(user1).closePosition(3);
 
@@ -508,6 +516,8 @@ describe("Option scalp", function() {
 
     await priceOracle.updateUnderlyingPrice("128218539300");
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(4);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -578,6 +588,8 @@ describe("Option scalp", function() {
     // size was $5000 so positions is 5000 / 1282.28 = 3.89, expected profit is 3.89 * -29.79 = -$115.81
 
     await priceOracle.updateUnderlyingPrice("125249327600");
+
+    await network.provider.send("evm_increaseTime", [10]);
 
     await optionScalp.closePosition(5);
 
@@ -656,6 +668,8 @@ describe("Option scalp", function() {
 
     await priceOracle.updateUnderlyingPrice("125952385100");
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(6);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -728,6 +742,8 @@ describe("Option scalp", function() {
     expect((await optionScalp.getLiquidationPrice(7))).to.eq("124334299773");
 
     await priceOracle.updateUnderlyingPrice("124168720400");
+
+    await network.provider.send("evm_increaseTime", [10]);
 
     await optionScalp.closePosition(7);
 

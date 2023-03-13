@@ -20,6 +20,8 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
+import "hardhat/console.sol";
+
 
 contract OptionScalp is Ownable, Pausable {
     using SafeERC20 for IERC20;
@@ -259,7 +261,11 @@ contract OptionScalp is Ownable, Pausable {
 
         openInterest[isShort] += size;
 
+        console.log("test");
+
         uint256 markPrice = getMarkPrice();
+
+        console.log("test1");
 
         // Calculate premium for ATM option in quote
         uint256 premium = calcPremium(
@@ -361,15 +367,15 @@ contract OptionScalp is Ownable, Pausable {
     /// @param id ID of position
     function closePosition(uint256 id) public {
         require(scalpPositions[id].isOpen, "Invalid position ID");
-        require(scalpPositions[id].openedAt + 10 seconds <= block.timestamp,
-            "Position must be open for at least 10 seconds"
+        require(scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
+            "Position must be open for at least 1 second"
         );
 
-        if (!isLiquidatable(id))
+        if (!isLiquidatable(id) && msg.sender != IERC721(scalpPositionMinter).ownerOf(id))
             require(
                 block.timestamp >=
                     scalpPositions[id].openedAt + scalpPositions[id].timeframe,
-                "Keeper can only close from an window before expiry"
+                "Keeper can only close after expiry"
             );
 
         uint256 swapped;
@@ -484,6 +490,7 @@ contract OptionScalp is Ownable, Pausable {
         uint256 timeToExpiry
     ) public view returns (uint256 premium) {
         uint256 expiry = block.timestamp + timeToExpiry;
+        console.log('OPTION PRICING');
         premium = ((uint256(
             optionPricing.getOptionPrice(
                 false,
