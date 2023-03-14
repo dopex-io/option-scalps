@@ -20,8 +20,6 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
-import "hardhat/console.sol";
-
 
 contract OptionScalp is Ownable, Pausable {
     using SafeERC20 for IERC20;
@@ -242,15 +240,17 @@ contract OptionScalp is Ownable, Pausable {
     }
 
     /// @notice Opens a position against/in favour of the base asset (if you short base is swapped to quote)
-    /// @param size Size is ie8
+    /// @param size Size of position ie8
     /// @param timeframeIndex Position of the array
     /// @param margin Collateral posted by user
+    /// @param entryLimit Minimum or maximum entry price (for short or long)
     function openPosition(
         bool isShort,
         uint256 size,
         uint256 timeframeIndex,
-        uint256 margin
-    ) public returns (uint256 id) {
+        uint256 margin,
+        uint256 entryLimit
+    ) public returns (uint256 id, uint256 entry) {
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
         require(size <= maxSize, "Your size is too big");
@@ -281,7 +281,6 @@ contract OptionScalp is Ownable, Pausable {
         );
 
         uint256 swapped;
-        uint256 entry;
 
         if (isShort) {
             // base to quote
@@ -294,6 +293,8 @@ contract OptionScalp is Ownable, Pausable {
             // size is ie8, swapped is ie18
             // 1e18 * ie8 / ie18 = ie8
             entry = ((10**18) * size) / swapped;
+
+            require(entry >= entryLimit, "Slippage");
 
             require(
                 baseLp.totalAvailableAssets() >= swapped,
@@ -313,6 +314,8 @@ contract OptionScalp is Ownable, Pausable {
             // size is ie8, swapped is ie18
             // 1e18 * ie8 / ie18 = ie8
             entry = ((10**18) * size) / swapped;
+
+            require(entry <= entryLimit, "Slippage");
 
             quoteLp.lockLiquidity(size / 10**2);
         }

@@ -154,7 +154,7 @@ describe("Option scalp", function() {
     expect(startQuoteBalance).to.eq('10000000000');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "20000000"); // 5000$ long
+    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "20000000", "0"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
     expect(quoteBalance).to.eq('9976221261');
