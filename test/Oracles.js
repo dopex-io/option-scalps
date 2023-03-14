@@ -53,7 +53,8 @@ describe("Option scalp", function() {
     // Price oracle
     priceOracle = await ethers.getContractAt("contracts/mock/MockPriceOracle.sol:MockPriceOracle", "0x19e6eE4C2cBe7Bcc4cd1ef0BCF7e764fECe23cC6");
     // Volatility oracle
-    volatilityOracle = await ethers.getContractAt("contracts/mock/MockVolatilityOracle.sol:MockVolatilityOracle", "0x7745370DFcC3780DD7675995b529d4e24960c015");
+    const VolatilityOracle = await ethers.getContractFactory("VolatilityOracleSimple");
+    volatilityOracle = await VolatilityOracle.deploy();
     // Option pricing
     const OptionPricing = await ethers.getContractFactory("OptionPricingSimple");
     optionPricing = await OptionPricing.deploy(1000, 1);
@@ -156,9 +157,9 @@ describe("Option scalp", function() {
     await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "20000000"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9975070396');
+    expect(quoteBalance).to.eq('9976221261');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
-    expect(amountPaid).to.eq("24929604"); // 20$ of margin + 2.929604$ of premium + 2.5$ of fees
+    expect(amountPaid).to.eq("23778739"); // 20$ of margin + 1.27$ of premium + 2.5$ of fees
   });
 });
