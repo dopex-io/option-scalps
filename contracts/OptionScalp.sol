@@ -551,8 +551,14 @@ contract OptionScalp is Ownable, Pausable {
   }
 
     /// @notice Owner-only function to update config
-    /// @param _maxSize ie8
-    /// @param _maxOpenInterest ie8
+    /// @param _maxSize ie8 Max size of a position
+    /// @param _maxOpenInterest ie8 Max open interest
+    /// @param _optionPricing Option Pricing
+    /// @param _volatilityOracle Volatility Oracle
+    /// @param _priceOracle Price ORacle
+    /// @param _insuranceFund Address receiving liquidation fees
+    /// @param _minimumMargin ie6 Minimum margin to opean a position
+    /// @param _feeOpenPosition ie6 Fees for opening position
     function updateConfig(
         uint256 _maxSize,
         uint256 _maxOpenInterest,
