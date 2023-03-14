@@ -550,12 +550,27 @@ contract OptionScalp is Ownable, Pausable {
       }
   }
 
-    /// @notice Owner-only function to update maxSize and maxOpenInterest
-    /// @param newMaxSize ie8
-    /// @param newMaxOpenInterest ie8
-    function updateConfig(uint256 newMaxSize, uint256 newMaxOpenInterest) onlyOwner external {
-        maxSize = newMaxSize;
-        maxOpenInterest = newMaxOpenInterest;
+    /// @notice Owner-only function to update config
+    /// @param _maxSize ie8
+    /// @param _maxOpenInterest ie8
+    function updateConfig(
+        uint256 _maxSize,
+        uint256 _maxOpenInterest,
+        IOptionPricing _optionPricing,
+        IVolatilityOracle _volatilityOracle,
+        IPriceOracle _priceOracle,
+        address _insuranceFund,
+        uint256 _minimumMargin,
+        uint256 _feeOpenPosition
+    ) onlyOwner external {
+        maxSize = _maxSize;
+        maxOpenInterest = _maxOpenInterest;
+        optionPricing = _optionPricing;
+        volatilityOracle = _volatilityOracle;
+        priceOracle = _priceOracle;
+        insuranceFund = _insuranceFund;
+        minimumMargin = _minimumMargin;
+        feeOpenPosition = _feeOpenPosition;
     }
 
     /// @notice Transfers all funds to msg.sender

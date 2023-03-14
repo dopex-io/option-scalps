@@ -856,7 +856,16 @@ describe("Option scalp", function() {
   });
 
   it("update max size and max open interest", async function() {
-    await optionScalp.updateConfig("1000000000000", "1500000000000");
+    await optionScalp.updateConfig(
+        "1000000000000",
+        "1500000000000",
+        optionPricing.address,
+        volatilityOracle.address,
+        priceOracle.address,
+        "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13",
+        "5000000",
+        "5000000"
+    );
   });
 
   it("user 1 cannot open position larger than max size", async function() {
