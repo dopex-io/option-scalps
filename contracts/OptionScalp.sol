@@ -548,7 +548,7 @@ contract OptionScalp is Ownable, Pausable {
           ++start;
           ++idx;
       }
-  }
+    }
 
     /// @notice Owner-only function to update config
     /// @param _maxSize ie8 Max size of a position
