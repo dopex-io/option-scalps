@@ -8,10 +8,12 @@ describe("Option scalp", function() {
 
   let usdc;
   let weth;
+  let wbtc;
+  let wbtcethPriceOracle;
   let quoteLp;
   let baseLp;
   let uniV3Router;
-  let priceOracle;
+  let ethUsdPriceOracle;
   let volatilityOracle;
   let optionPricing;
   let optionScalp;
@@ -31,7 +33,7 @@ describe("Option scalp", function() {
     user3 = signers[4];
   });
 
-  it("should deploy option scalp with oracles", async function() {
+  it("should deploy option scalp ETHUSD with oracles", async function() {
     await network.provider.request({
         method: "hardhat_reset",
         params: [
@@ -51,7 +53,7 @@ describe("Option scalp", function() {
     // Uni v3 router
     uniV3Router = await ethers.getContractAt("contracts/interface/IUniswapV3Router.sol:IUniswapV3Router", "0xE592427A0AEce92De3Edee1F18E0157C05861564");
     // Price oracle
-    priceOracle = await ethers.getContractAt("contracts/mock/MockPriceOracle.sol:MockPriceOracle", "0x19e6eE4C2cBe7Bcc4cd1ef0BCF7e764fECe23cC6");
+    ethUsdPriceOracle = await ethers.getContractAt("contracts/mock/MockPriceOracle.sol:MockPriceOracle", "0x19e6eE4C2cBe7Bcc4cd1ef0BCF7e764fECe23cC6");
     // Volatility oracle
     const VolatilityOracle = await ethers.getContractFactory("VolatilityOracleSimple");
     volatilityOracle = await VolatilityOracle.deploy();
@@ -64,13 +66,21 @@ describe("Option scalp", function() {
     optionScalp = await OptionScalp.deploy(
       weth.address,
       usdc.address,
-      optionPricing.address,
-      volatilityOracle.address,
-      priceOracle.address,
+      18,
+      6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
-      "10000000", // $10
-      "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13" // Insurance fund
+      [
+          "100000000000",  // $100.000
+          "10000000000000",  // $10M
+          optionPricing.address,
+          volatilityOracle.address,
+          ethUsdPriceOracle.address,
+          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+          "10000000", // $10
+          "5000000", // 0.05%
+          "5000000",  // $5
+      ]
     );
 
     // Base LP
@@ -154,12 +164,57 @@ describe("Option scalp", function() {
     expect(startQuoteBalance).to.eq('10000000000');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "20000000", "0"); // 5000$ long
+    await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "20000000", "0"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9976221261');
+    expect(quoteBalance).to.eq('9976221264');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
-    expect(amountPaid).to.eq("23778739"); // 20$ of margin + 1.27$ of premium + 2.5$ of fees
+    expect(amountPaid).to.eq("23778736"); // 20$ of margin + 1.27$ of premium + 2.5$ of fees
+  });
+
+  it("should deploy option scalp WBTCUSD with oracles", async function() {
+    // USDC
+    wbtc = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f");
+    // Uni v3 router
+    uniV3Router = await ethers.getContractAt("contracts/interface/IUniswapV3Router.sol:IUniswapV3Router", "0xE592427A0AEce92De3Edee1F18E0157C05861564");
+    // Price oracle
+    wbtcethPriceOracle = await (await ethers.getContractFactory("VolatilityOracleSimple")).deploy();
+    // Volatility oracle
+    const VolatilityOracle = await ethers.getContractFactory("VolatilityOracleSimple");
+    volatilityOracle = await VolatilityOracle.deploy();
+    // Option pricing
+    const OptionPricing = await ethers.getContractFactory("OptionPricingSimple");
+    optionPricing = await OptionPricing.deploy(1000, 1);
+
+    // Option scalp
+    const OptionScalp = await ethers.getContractFactory("OptionScalp");
+    optionScalp = await OptionScalp.deploy(
+      wbtc.address,
+      weth.address,
+      8,
+      18,
+      "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
+      "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
+      [
+          "100000000000",  // $100.000
+          "10000000000000",  // $10M
+          optionPricing.address,
+          volatilityOracle.address,
+          wbtcethPriceOracle.address,
+          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+          "10000000", // $10
+          "5000000", // 0.05%
+          "5000000",  // $5
+      ]
+    );
+
+    // Base LP
+    baseLp = (await ethers.getContractFactory("ScalpLP")).attach((await optionScalp.baseLp()));
+
+    // Quote LP
+    quoteLp = (await ethers.getContractFactory("ScalpLP")).attach((await optionScalp.quoteLp()));
+
+    console.log("deployed option scalp:", optionScalp.address);
   });
 });

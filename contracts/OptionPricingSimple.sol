@@ -70,7 +70,7 @@ contract OptionPricingSimple is Ownable, IOptionPricing {
         uint256 strike,
         uint256 lastPrice,
         uint256 volatility
-    ) external view override returns (uint256) {
+    ) external view override returns (uint256) { // (6 decimals)
         uint256 timeToExpiry = expiry.sub(block.timestamp).mul(100).div(864);
         // ATTENTION: MULTIPLIED BY 100 TO HAVE 4 DECIMALS DAYS_PRECISION
 
@@ -86,7 +86,7 @@ contract OptionPricingSimple is Ownable, IOptionPricing {
             .div(BlackScholes.DIVISOR);
 
         uint256 minOptionPrice = lastPrice.mul(minOptionPricePercentage).div(
-            1e10
+            1e12
         );
 
         if (minOptionPrice > optionPrice) {
