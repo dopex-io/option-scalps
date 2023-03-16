@@ -25,21 +25,61 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log: true,
   });
 
-  const optionScalp = await deployments.deploy("OptionScalp", {
+  const wethOptionScalp = await deployments.deploy("OptionScalp", {
     args: [
       weth.address,
       usdc.address,
-      optionPricingSimple.address,
-      volatilityOracleSimple.address,
-      "0x19e6eE4C2cBe7Bcc4cd1ef0BCF7e764fECe23cC6",
+      18,
+      6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
-      "10000000", // $10
-      "0x9c21ca464a2ee450d05d605d74ad415c6baaa054" // Insurance fund
+      [
+          "100000000000",  // $100.000
+          "10000000000000",  // $10M
+          optionPricingSimple.address,
+          volatilityOracleSimple.address,
+          "0x19e6eE4C2cBe7Bcc4cd1ef0BCF7e764fECe23cC6",
+          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+          "10000000", // $10
+          "5000000", // 0.05%
+          "5000000",  // $5
+      ]
     ],
     from: deployer,
     log: true,
   });
 
-  console.log(optionScalp.address);
+  console.log(wethOptionScalp.address);
+
+  const wbtcethPriceOracle = await deployments.deploy("EthBtcPriceOracle", {
+     args: [],
+     from: deployer,
+     logs: true,
+  });
+
+  const wbtcOptionScalp = await deployments.deploy("OptionScalp", {
+    args: [
+      wbtc.address,
+      weth.address,
+      8,
+      18,
+      "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
+      "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
+      [
+          "10000000000000000000",  // 10 ETH
+          "1000000000000000000000",  // 1000 ETH
+          optionPricingSimple.address,
+          volatilityOracleSimple.address,
+          wbtcethPriceOracle.address,
+          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+          "5000000000000000", // 0.005
+          "5000000", // 0.05%
+          "2500000000000000",  // 0.0025
+      ]
+    ],
+    from: deployer,
+    log: true,
+  });
+
+  console.log(wbtcOptionScalp.address);
 };
