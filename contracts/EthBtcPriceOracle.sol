@@ -50,7 +50,7 @@ contract EthBtcPriceOracle is IPriceOracle {
         return getUnderlyingPrice();
     }
 
-    /// @notice Returns the underlying price
+    /// @notice Returns the underlying price (tokenDecimals + 2)
     function getUnderlyingPrice() public view returns (uint256) {
         bool isRaised = chainlinkFlags.getFlag(FLAG_ARBITRUM_SEQ_OFFLINE);
         if (isRaised) {
@@ -59,6 +59,6 @@ contract EthBtcPriceOracle is IPriceOracle {
         (, int256 ethPrice, , , ) = ethPriceFeed.latestRoundData();
         (, int256 wbtcPrice, , , ) = wbtcPriceFeed.latestRoundData();
 
-        return uint256((10 ** 18) * ethPrice / wbtcPrice);
+        return uint256((10 ** (18 + 2)) * wbtcPrice / ethPrice);
     }
 }
