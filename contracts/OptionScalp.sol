@@ -20,8 +20,6 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
-import "hardhat/console.sol";
-
 
 contract OptionScalp is Ownable, Pausable {
     using SafeERC20 for IERC20;
@@ -296,14 +294,8 @@ contract OptionScalp is Ownable, Pausable {
             timeframes[timeframeIndex]
         );
 
-        console.log("Premium");
-        console.log(premium);
-
         // Calculate opening fees in quote
         uint256 openingFees = calcFees(size);
-
-        console.log("Fees");
-        console.log(openingFees);
 
         // We transfer margin + premium + fees from user
         quote.transferFrom(
@@ -473,11 +465,6 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Returns whether an open position is liquidatable
     function isLiquidatable(uint256 id) public view returns (bool) {
-        console.log("Margin");
-        console.log(scalpPositions[id].margin);
-        console.log("PNL");
-        console.logInt(calcPnl(id));
-
         return int256(scalpPositions[id].margin) + calcPnl(id) <=
             int256(minimumAbsoluteLiquidationThreshold *
                 (scalpPositions[id].positions / (10 ** quoteDecimals)));
