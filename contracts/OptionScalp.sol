@@ -474,6 +474,7 @@ contract OptionScalp is Ownable, Pausable {
         openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
         scalpPositions[id].isOpen = false;
         scalpPositions[id].pnl = int256(traderWithdraw) - int256(scalpPositions[id].margin + scalpPositions[id].premium + scalpPositions[id].fees);
+        scalpPositionMinter.burn(id);
         cumulativePnl[owner] += scalpPositions[id].pnl;
         cumulativeVolume[owner] += scalpPositions[id].size;
 
