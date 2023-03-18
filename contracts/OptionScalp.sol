@@ -78,6 +78,12 @@ contract OptionScalp is Ownable, Pausable {
     // Open interest (quoteDecimals)
     mapping(bool => uint256) public openInterest;
 
+    // Cumulative pnl (quoteDecimals)
+    mapping(address => int256) public cumulativePnl;
+
+    // Cumulative volume (quoteDecimals)
+    mapping(address => uint256) public cumulativeVolume;
+
     // Withdraw timeout
     uint256 public withdrawTimeout;
 
@@ -176,6 +182,7 @@ contract OptionScalp is Ownable, Pausable {
         minimumMargin = config.minimumMargin;
         feeOpenPosition = config.feeOpenPosition;
         minimumAbsoluteLiquidationThreshold = config.minimumAbsoluteLiquidationThreshold;
+        withdrawTimeout = config.withdrawTimeout;
 
         scalpPositionMinter = new ScalpPositionMinter();
 
@@ -399,7 +406,9 @@ contract OptionScalp is Ownable, Pausable {
             "Position must be open for at least 1 second"
         );
 
-        if (!isLiquidatable(id) && msg.sender != IERC721(scalpPositionMinter).ownerOf(id))
+        address owner = IERC721(scalpPositionMinter).ownerOf(id);
+
+        if (!isLiquidatable(id) && msg.sender != owner)
             require(
                 block.timestamp >=
                     scalpPositions[id].openedAt + scalpPositions[id].timeframe,
@@ -428,7 +437,7 @@ contract OptionScalp is Ownable, Pausable {
                 );
 
                 quote.transfer(
-                    isLiquidatable(id) ? insuranceFund : IERC721(scalpPositionMinter).ownerOf(id),
+                    isLiquidatable(id) ? insuranceFund : owner,
                     traderWithdraw
                 );
             } else {
@@ -454,7 +463,7 @@ contract OptionScalp is Ownable, Pausable {
                     scalpPositions[id].amountBorrowed;
 
                 quote.transfer(
-                    isLiquidatable(id) ? insuranceFund : IERC721(scalpPositionMinter).ownerOf(id),
+                    isLiquidatable(id) ? insuranceFund : owner,
                     traderWithdraw
                 );
             } else {
@@ -464,6 +473,8 @@ contract OptionScalp is Ownable, Pausable {
 
         openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
         scalpPositions[id].isOpen = false;
+        cumulativePnl[owner] += scalpPositions[id].pnl;
+        cumulativeVolume[owner] += scalpPositions[id].size;
 
         emit ClosePosition(id, int256(traderWithdraw), msg.sender);
     }
@@ -592,6 +603,7 @@ contract OptionScalp is Ownable, Pausable {
         minimumMargin = config.minimumMargin;
         feeOpenPosition = config.feeOpenPosition;
         minimumAbsoluteLiquidationThreshold = config.minimumAbsoluteLiquidationThreshold;
+        withdrawTimeout = config.withdrawTimeout;
     }
 
     /// @notice Transfers all funds to msg.sender

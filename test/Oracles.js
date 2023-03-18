@@ -85,7 +85,7 @@ describe("Option scalp", function() {
           "10000000", // $10
           "5000000", // 0.05%
           "5000000",  // $5
-          "60" // 1 minute
+          "60" // 1 minutes
       ]
     );
 
@@ -152,6 +152,7 @@ describe("Option scalp", function() {
     await expect(optionScalp.connect(user0).deposit(user0.address, true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
     await optionScalp.connect(user0).deposit(user0.address, true, "10000000000");
+
     await optionScalp.connect(user0).deposit(user0.address, false, ethers.utils.parseEther("10.0"));
   });
 
@@ -161,10 +162,15 @@ describe("Option scalp", function() {
     const balance = await quoteLp.balanceOf(user0.address);
     expect(balance).to.eq("10000000000");
 
+    expect(user0.address).to.eq("0x70997970C51812dc3A010C7d01b50e0d17dc79C8");
+
     // Allowance is required
     await quoteLp.connect(user0).approve(optionScalp.address, "1000000000000000000000000000000000");
 
-    await expect(optionScalp.connect(user0).withdraw(true, "10000000000000")).to.be.revertedWith('Not enough available assets to satisfy withdrawal');
+    await expect(optionScalp.connect(user0).withdraw(true, balance.div(2))).to.be.revertedWith('Cooling period');
+
+    await network.provider.send("evm_increaseTime", [60]);
+    await network.provider.send("evm_mine");
 
     const startQuoteBalance = await usdc.balanceOf(user0.address);
     await optionScalp.connect(user0).withdraw(true, balance.div(2));
@@ -258,6 +264,9 @@ describe("Option scalp", function() {
     // Allowance is required
     await quoteLp.connect(user0).approve(optionScalp.address, "1000000000000000000000000000000000");
 
+    await network.provider.send("evm_increaseTime", [60]);
+    await network.provider.send("evm_mine");
+
     await expect(optionScalp.connect(user0).withdraw(true, "5000000000000000000")).to.be.revertedWith('Not enough available assets to satisfy withdrawal');
 
     const startQuoteBalance = await weth.balanceOf(user0.address);
@@ -336,8 +345,6 @@ describe("Option scalp", function() {
 
     expect((await optionScalp.isLiquidatable(0))).to.eq(false);
 
-    await network.provider.send("evm_increaseTime", [10]);
-
     await optionScalp.connect(user1).closePosition(0);
 
     quoteBalance = await weth.balanceOf(user1.address);
@@ -351,8 +358,8 @@ describe("Option scalp", function() {
 
   it("user 0 withdraws all eth deposit with 0 pnl", async function() {
     const startQuoteBalance = await weth.balanceOf(user0.address);
-
     await quoteLp.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("2.0"));
+
     await optionScalp.connect(user0).withdraw(true, ethers.utils.parseEther("2.0"));
 
     const endQuoteBalance = await weth.balanceOf(user0.address);

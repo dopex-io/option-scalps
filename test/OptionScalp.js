@@ -69,7 +69,7 @@ describe("Option scalp", function() {
           "10000000", // $10
           "5000000", // 0.05%
           "5000000",  // $5
-          "60" // 1 minute
+          "1" // 1 second
       ]
     );
 
