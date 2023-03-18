@@ -36,6 +36,9 @@ contract ScalpLP is ERC4626 {
     // @dev Locked liquidity in active scalp positions
     uint public _lockedLiquidity;
 
+    // @dev Transfer freezing after a new deposit (user -> time)
+    mapping(address => uint256) public lockedUsers;
+
     /*==== CONSTRUCTOR ====*/
     /**
      * @param _scalp The address of the scalp contract creating the lp token
@@ -66,6 +69,26 @@ contract ScalpLP is ERC4626 {
         returns (string memory)
     {
         return string(abi.encodePacked(_a, _b));
+    }
+
+    function deposit(uint256 assets, address receiver) public virtual override returns (uint256 shares) {
+        // Check for rounding error since we round down in previewDeposit.
+        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+
+        // Need to transfer before minting or ERC777s could reenter.
+        asset.safeTransferFrom(msg.sender, address(this), assets);
+
+        _mint(receiver, shares);
+
+        lockedUsers[receiver] = block.timestamp + scalp.withdrawTimeout();
+
+        emit Deposit(msg.sender, receiver, assets, shares);
+
+        afterDeposit(assets, shares);
+    }
+
+    function _beforeTokenTransfer(address from, address, uint256) internal virtual {
+        require(lockedUsers[from] <= block.timestamp, "Cooling period");
     }
 
     function totalAssets() public view virtual override returns (uint) {

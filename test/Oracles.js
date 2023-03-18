@@ -85,6 +85,7 @@ describe("Option scalp", function() {
           "10000000", // $10
           "5000000", // 0.05%
           "5000000",  // $5
+          "60" // 1 minute
       ]
     );
 
@@ -148,10 +149,10 @@ describe("Option scalp", function() {
     await usdc.connect(user0).approve(optionScalp.address, "10000000000");
     await weth.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("10.0"));
 
-    await expect(optionScalp.connect(user0).deposit(true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    await expect(optionScalp.connect(user0).deposit(user0.address, true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
-    await optionScalp.connect(user0).deposit(true, "10000000000");
-    await optionScalp.connect(user0).deposit(false, ethers.utils.parseEther("10.0"));
+    await optionScalp.connect(user0).deposit(user0.address, true, "10000000000");
+    await optionScalp.connect(user0).deposit(user0.address, false, ethers.utils.parseEther("10.0"));
   });
 
   it("user 0 withdraws half", async function() {
@@ -218,6 +219,7 @@ describe("Option scalp", function() {
           "5000000000000000", // 0.005
           "5000000", // 0.05%
           "2500000000000000",  // 0.0025
+          "60" // 1 minute
       ]
     );
 
@@ -238,13 +240,13 @@ describe("Option scalp", function() {
     await wbtc.connect(user0).approve(optionScalp.address, "10000000000");
     await weth.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("10.0"));
 
-    await expect(optionScalp.connect(user0).deposit(true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    await expect(optionScalp.connect(user0).deposit(user0.address, true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
     expect((await weth.balanceOf(user0.address))).to.eq("5000000000000000000");
     expect((await wbtc.balanceOf(user0.address))).to.eq("5000000000");
 
-    await optionScalp.connect(user0).deposit(true, ethers.utils.parseEther("4.0")); // 4 ETH
-    await optionScalp.connect(user0).deposit(false, "400000000"); // 4 BTC
+    await optionScalp.connect(user0).deposit(user0.address, true, ethers.utils.parseEther("4.0")); // 4 ETH
+    await optionScalp.connect(user0).deposit(user0.address, false, "400000000"); // 4 BTC
   });
 
   it("user 0 withdraws half", async function() {
@@ -332,7 +334,7 @@ describe("Option scalp", function() {
     // price pumps from 1/0.06936534 to 1/0.06896032
     // size was 1 ETH so positions is 1 / (1/0.06936534) = 0.06936534, expected profit is 0.06936534 * -0.0846709986 = -0.00587323261 ETH
 
-    expect((await optionScalp.isLiquidatable(0))).to.eq(true);
+    expect((await optionScalp.isLiquidatable(0))).to.eq(false);
 
     await network.provider.send("evm_increaseTime", [10]);
 
@@ -340,11 +342,11 @@ describe("Option scalp", function() {
 
     quoteBalance = await weth.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('14899244252118136200');
+    expect(quoteBalance).to.eq('14992270585236757040');
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
-    expect(profit).to.eq("-100755747881863800"); // -0.100755748 ETH
+    expect(profit).to.eq("-7729414763242960"); // -0.100755748 ETH
   });
 
   it("user 0 withdraws all eth deposit with 0 pnl", async function() {

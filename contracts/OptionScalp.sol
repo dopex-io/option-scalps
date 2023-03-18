@@ -78,6 +78,9 @@ contract OptionScalp is Ownable, Pausable {
     // Open interest (quoteDecimals)
     mapping(bool => uint256) public openInterest;
 
+    // Withdraw timeout
+    uint256 public withdrawTimeout;
+
     // Scalp positions
     mapping(uint256 => ScalpPosition) public scalpPositions;
 
@@ -97,6 +100,8 @@ contract OptionScalp is Ownable, Pausable {
         uint256 feeOpenPosition;
         // quoteDecimals Min. Abs. Thres. to liquidate
         uint256 minimumAbsoluteLiquidationThreshold;
+        // seconds to wait before withdraw
+        uint256 withdrawTimeout;
     }
 
     struct ScalpPosition {
@@ -236,13 +241,13 @@ contract OptionScalp is Ownable, Pausable {
     // Deposit assets
     // @param isQuote If true user deposits quote token (else base)
     // @param amount Amount of quote asset to deposit to LP
-    function deposit(bool isQuote, uint256 amount) public returns (uint256 shares) {
+    function deposit(address receiver, bool isQuote, uint256 amount) public returns (uint256 shares) {
         if (isQuote) {
             quote.transferFrom(msg.sender, address(this), amount);
-            shares = quoteLp.deposit(amount, msg.sender);
+            shares = quoteLp.deposit(amount, receiver);
         } else {
             base.transferFrom(msg.sender, address(this), amount);
-            shares = baseLp.deposit(amount, msg.sender);
+            shares = baseLp.deposit(amount, receiver);
         }
 
         emit Deposit(isQuote, amount, msg.sender);
@@ -540,12 +545,12 @@ contract OptionScalp is Ownable, Pausable {
             pnl =
                 (int256(scalpPositions[id].positions) *
                     (int256(scalpPositions[id].entry) - int256(markPrice))) /
-                10**6;
+                int256(10 ** quoteDecimals);
         else
             pnl =
                 (int256(scalpPositions[id].positions) *
                     (int256(markPrice) - int256(scalpPositions[id].entry))) /
-                10**6;
+                int256(10 ** quoteDecimals);
     }
 
     /// @notice Public function to retrieve price of base asset from oracle

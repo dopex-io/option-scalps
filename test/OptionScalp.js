@@ -69,6 +69,7 @@ describe("Option scalp", function() {
           "10000000", // $10
           "5000000", // 0.05%
           "5000000",  // $5
+          "60" // 1 minute
       ]
     );
 
@@ -119,10 +120,10 @@ describe("Option scalp", function() {
     await usdc.connect(user0).approve(optionScalp.address, "10000000000");
     await weth.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("10.0"));
 
-    await expect(optionScalp.connect(user0).deposit(true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    await expect(optionScalp.connect(user0).deposit(user0.address, true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
-    await optionScalp.connect(user0).deposit(true, "10000000000");
-    await optionScalp.connect(user0).deposit(false, ethers.utils.parseEther("10.0"));
+    await optionScalp.connect(user0).deposit(user0.address, true, "10000000000");
+    await optionScalp.connect(user0).deposit(user0.address, false, ethers.utils.parseEther("10.0"));
   });
 
   it("user 0 withdraws half", async function() {
@@ -874,6 +875,7 @@ describe("Option scalp", function() {
          "10000000", // $10
          "5000000", // 0.05%
          "5000000",  // $5
+         "60" // 1 minute
     ]);
   });
 
@@ -892,6 +894,7 @@ describe("Option scalp", function() {
              "10000000", // $10
              "5000000", // 0.05%
              "5000000",  // $5
+             "60" // 1 minute
       ]);
       await expect(optionScalp.connect(user1).openPosition(true, "1500000000", 0, "150000000", "0")).to.be.revertedWith("OI is too high");
   });
