@@ -21,7 +21,7 @@ import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
 
-contract OptionScalp is Ownable, Pausable {
+contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // Base token
@@ -248,7 +248,7 @@ contract OptionScalp is Ownable, Pausable {
     // Deposit assets
     // @param isQuote If true user deposits quote token (else base)
     // @param amount Amount of quote asset to deposit to LP
-    function deposit(address receiver, bool isQuote, uint256 amount) public returns (uint256 shares) {
+    function deposit(address receiver, bool isQuote, uint256 amount) nonReentrant public returns (uint256 shares)  {
         if (isQuote) {
             quote.safeTransferFrom(msg.sender, address(this), amount);
             shares = quoteLp.deposit(amount, receiver);
@@ -286,7 +286,7 @@ contract OptionScalp is Ownable, Pausable {
         uint256 timeframeIndex,
         uint256 margin,
         uint256 entryLimit
-    ) public returns (uint256 id, uint256 entry) {
+    ) nonReentrant public returns (uint256 id, uint256 entry) {
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
         require(size <= maxSize, "Your size is too big");
@@ -502,7 +502,7 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Allow only scalp LP contract to claim collateral
     /// @param amount Amount of quote/base assets to transfer
-    function claimCollateral(uint256 amount) public {
+    function claimCollateral(uint256 amount) nonReentrant public {
         require(
             msg.sender == address(quoteLp) || msg.sender == address(baseLp),
             "Only Scalp LP contract can claim collateral"
