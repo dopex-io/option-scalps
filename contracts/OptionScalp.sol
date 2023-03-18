@@ -250,10 +250,10 @@ contract OptionScalp is Ownable, Pausable {
     // @param amount Amount of quote asset to deposit to LP
     function deposit(address receiver, bool isQuote, uint256 amount) public returns (uint256 shares) {
         if (isQuote) {
-            quote.transferFrom(msg.sender, address(this), amount);
+            quote.safeTransferFrom(msg.sender, address(this), amount);
             shares = quoteLp.deposit(amount, receiver);
         } else {
-            base.transferFrom(msg.sender, address(this), amount);
+            base.safeTransferFrom(msg.sender, address(this), amount);
             shares = baseLp.deposit(amount, receiver);
         }
 
@@ -310,7 +310,7 @@ contract OptionScalp is Ownable, Pausable {
         uint256 openingFees = calcFees(size);
 
         // We transfer margin + premium + fees from user
-        quote.transferFrom(
+        quote.safeTransferFrom(
             msg.sender,
             address(this),
             margin + premium + openingFees
@@ -436,7 +436,7 @@ contract OptionScalp is Ownable, Pausable {
                     swapped - scalpPositions[id].amountBorrowed
                 );
 
-                quote.transfer(
+                quote.safeTransfer(
                     isLiquidatable(id) ? insuranceFund : owner,
                     traderWithdraw
                 );
@@ -462,7 +462,7 @@ contract OptionScalp is Ownable, Pausable {
                     swapped -
                     scalpPositions[id].amountBorrowed;
 
-                quote.transfer(
+                quote.safeTransfer(
                     isLiquidatable(id) ? insuranceFund : owner,
                     traderWithdraw
                 );
@@ -507,9 +507,9 @@ contract OptionScalp is Ownable, Pausable {
             msg.sender == address(quoteLp) || msg.sender == address(baseLp),
             "Only Scalp LP contract can claim collateral"
         );
-        if (msg.sender == address(quoteLp)) quote.transfer(msg.sender, amount);
+        if (msg.sender == address(quoteLp)) quote.safeTransfer(msg.sender, amount);
         else if (msg.sender == address(baseLp))
-            base.transfer(msg.sender, amount);
+            base.safeTransfer(msg.sender, amount);
     }
 
     /// @notice External function to return the volatility
