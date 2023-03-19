@@ -3,16 +3,15 @@ pragma solidity ^0.8.9;
 
 import {IOptionScalp} from "../interface/IOptionScalp.sol";
 
-import "hardhat/console.sol";
-
 contract Keeper {
     address public owner;
-    mapping(address => uint256) public whitelistedKeepers;
+    mapping(address => bool) public whitelistedKeepers;
 
-    event WhitelistedKeeperSetAs(address _keeper, uint256 _setAs);
+    event WhitelistedKeeperSetAs(address _keeper, bool _setAs);
 
     constructor() {
         owner = msg.sender;
+        whitelistedKeepers[msg.sender] = true;
     }
 
     function getCloseablePositions(
@@ -40,14 +39,6 @@ contract Keeper {
                     block.timestamp >=
                     scalpPosition.openedAt + scalpPosition.timeframe;
 
-                console.log(
-                    scalpPosition.openedAt,
-                    scalpPosition.timeframe,
-                    block.timestamp
-                );
-
-                console.log("Expiry window", isWithinExpiryWindow);
-
                 if (isLiquidatable || isWithinExpiryWindow) {
                     _closeablePositions[_startIndex] = _startIndex;
                 }
@@ -62,9 +53,9 @@ contract Keeper {
         uint256[] memory _positionIds,
         address _scalpContract
     ) external {
+        require(whitelistedKeepers[msg.sender], "KEEPER: CALLER NOT WHITELSITED");
         uint256 startIndex;
         do {
-            console.log(_positionIds[startIndex]);
             IOptionScalp(_scalpContract).closePosition(
                 _positionIds[startIndex]
             );
@@ -75,7 +66,7 @@ contract Keeper {
         } while (startIndex < _positionIds.length);
     }
 
-    function setWhitelistedKeeper(address _keeper, uint256 _setAs) external {
+    function setWhitelistedKeeper(address _keeper, bool _setAs) external {
         require(msg.sender == owner, "KEEPER: NOT OWNER");
         whitelistedKeepers[_keeper] = _setAs;
         emit WhitelistedKeeperSetAs(_keeper, _setAs);
