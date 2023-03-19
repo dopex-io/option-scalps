@@ -25,6 +25,7 @@ contract ScalpPositionMinter is
 
   constructor() {
     optionScalpContract = msg.sender;
+    _tokenIdCounter.increment();
   }
 
   function setScalpContract(address _optionScalpContract)
