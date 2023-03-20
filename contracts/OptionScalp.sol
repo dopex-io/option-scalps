@@ -419,6 +419,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
         uint256 traderWithdraw;
 
         scalpPositions[id].isOpen = false;
+        scalpPositionMinter.burn(id);
 
         if (scalpPositions[id].isShort) {
             // quote to base
