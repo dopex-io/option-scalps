@@ -418,6 +418,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
         uint256 swapped;
         uint256 traderWithdraw;
 
+        scalpPositions[id].isOpen = false;
+        scalpPositionMinter.burn(id);
+
         if (scalpPositions[id].isShort) {
             // quote to base
             swapped = _swapExactIn(
@@ -472,9 +475,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
         }
 
         openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
-        scalpPositions[id].isOpen = false;
         scalpPositions[id].pnl = int256(traderWithdraw) - int256(scalpPositions[id].margin + scalpPositions[id].premium + scalpPositions[id].fees);
-        scalpPositionMinter.burn(id);
         cumulativePnl[owner] += scalpPositions[id].pnl;
         cumulativeVolume[owner] += scalpPositions[id].size;
 

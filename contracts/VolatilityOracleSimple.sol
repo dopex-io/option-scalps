@@ -6,7 +6,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract VolatilityOracleSimple is Ownable {
     uint256 volatility = 50;
 
-    function getVolatility(uint256 _strike) external returns (uint256) {
+    function getVolatility(uint256 _strike) external view returns (uint256) {
         return volatility;
     }
 
