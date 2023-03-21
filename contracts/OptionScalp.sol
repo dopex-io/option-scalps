@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import {IERC20} from "./interface/IERC20.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
+import {ContractWhitelist} from "./helpers/ContractWhitelist.sol";
 
 import {ScalpLP} from "./token/ScalpLP.sol";
 
@@ -21,7 +22,7 @@ import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
 
-contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
+contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     using SafeERC20 for IERC20;
 
     // Base token
@@ -249,6 +250,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
     // @param isQuote If true user deposits quote token (else base)
     // @param amount Amount of quote asset to deposit to LP
     function deposit(address receiver, bool isQuote, uint256 amount) nonReentrant public returns (uint256 shares)  {
+        _isEligibleSender();
+
         if (isQuote) {
             quote.safeTransferFrom(msg.sender, address(this), amount);
             shares = quoteLp.deposit(amount, receiver);
@@ -264,6 +267,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
     // @param isQuote If true user withdraws quote token (else base)
     // @param amount Amount of LP positions to withdraw
     function withdraw(bool isQuote, uint256 amount) public returns (uint256 assets) {
+        _isEligibleSender();
+
         if (isQuote) {
             assets = quoteLp.redeem(amount, msg.sender, msg.sender);
         } else {
@@ -287,6 +292,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
         uint256 margin,
         uint256 entryLimit
     ) nonReentrant public returns (uint256 id, uint256 entry) {
+        _isEligibleSender();
+
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
         require(size <= maxSize, "Your size is too big");
@@ -401,6 +408,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard {
     /// @notice Closes an open position
     /// @param id ID of position
     function closePosition(uint256 id) public {
+        _isEligibleSender();
+
         require(scalpPositions[id].isOpen, "Invalid position ID");
         require(scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
             "Position must be open for at least 1 second"

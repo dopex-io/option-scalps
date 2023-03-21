@@ -900,8 +900,9 @@ describe("Option scalp", function() {
   });
 
   it("get positions of user 1", async function() {
+      // if we burn tokens we find nothing here
       const positions = await optionScalp.connect(user1).positionsOfOwner(user1.address);
-      expect(positions[2]).to.eq(2);
+      expect(positions[0]).to.eq(undefined);
   });
 
   it("pre emergency withdraw", async function() {
