@@ -296,7 +296,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
-        require(size <= maxSize, "Your size is too big");
+        require(size <= maxSize, "Position exposure is too high");
         require(
             size + openInterest[isShort] <= maxOpenInterest,
             "OI is too high"
