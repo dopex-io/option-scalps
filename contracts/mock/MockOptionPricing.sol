@@ -9,6 +9,6 @@ contract MockOptionPricing {
         uint256,
         uint256
     ) external pure returns (uint256) {
-        return 5e8; // 5$
+        return 5e6; // 5$
     }
 }

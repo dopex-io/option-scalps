@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import {IERC20} from "./interface/IERC20.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
+import {ContractWhitelist} from "./helpers/ContractWhitelist.sol";
 
 import {ScalpLP} from "./token/ScalpLP.sol";
 
@@ -21,13 +22,17 @@ import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
 
-contract OptionScalp is Ownable, Pausable {
+contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     using SafeERC20 for IERC20;
 
     // Base token
     IERC20 public base;
     // Quote token
     IERC20 public quote;
+    // Base decimals
+    uint256 public baseDecimals;
+    // Quote decimals
+    uint256 public quoteDecimals;
     // Scalp Base LP token
     ScalpLP public baseLp;
     // Scalp Quote LP token
@@ -53,28 +58,58 @@ contract OptionScalp is Ownable, Pausable {
     // Address of multisig which handles insurance fund
     address public insuranceFund;
 
-    // Minimum margin to open a position
-    uint256 public minimumMargin = 5e6; // $5
+    // Minimum margin to open a position (quoteDecimals)
+    uint256 public minimumMargin;
 
-    // Fees for opening position
-    uint256 public feeOpenPosition = 5000000; // 0.05%
+    // Fees for opening position (divisor)
+    uint256 public feeOpenPosition;
 
     // Minimum absolute threshold in quote asset above (entry - margin) when liquidate() is callable
-    uint256 public minimumAbsoluteLiquidationThreshold = 5e6; // $5
+    uint256 public minimumAbsoluteLiquidationThreshold;
 
-    // Max size of a position (ie8)
-    uint256 public maxSize = 100000e8; // $100k
+    // Max size of a position (quoteDecimals)
+    uint256 public maxSize;
 
-    // Max open interest (ie8)
-    uint256 public maxOpenInterest = 10000000e8; // $10M
+    // Max open interest (quoteDecimals)
+    uint256 public maxOpenInterest;
 
-    // Open interest (ie8)
+    // Used for percentages
+    uint256 public constant divisor = 1e8;
+
+    // Open interest (quoteDecimals)
     mapping(bool => uint256) public openInterest;
 
-    uint256 public constant divisor = 1e8;
+    // Cumulative pnl (quoteDecimals)
+    mapping(address => int256) public cumulativePnl;
+
+    // Cumulative volume (quoteDecimals)
+    mapping(address => uint256) public cumulativeVolume;
+
+    // Withdraw timeout
+    uint256 public withdrawTimeout;
 
     // Scalp positions
     mapping(uint256 => ScalpPosition) public scalpPositions;
+
+    struct Configuration {
+        // quoteDecimals Max size of a position
+        uint256 maxSize;
+        // quoteDecimals Max open interest
+        uint256 maxOpenInterest;
+        IOptionPricing optionPricing;
+        IVolatilityOracle volatilityOracle;
+        IPriceOracle priceOracle;
+        // Address receiving liquidation fees
+        address insuranceFund;
+        // quoteDecimals Minimum margin to open a position
+        uint256 minimumMargin;
+        // divisor Fees for opening position
+        uint256 feeOpenPosition;
+        // quoteDecimals Min. Abs. Thres. to liquidate
+        uint256 minimumAbsoluteLiquidationThreshold;
+        // seconds to wait before withdraw
+        uint256 withdrawTimeout;
+    }
 
     struct ScalpPosition {
         // Is position open
@@ -123,30 +158,32 @@ contract OptionScalp is Ownable, Pausable {
     constructor(
         address _base,
         address _quote,
-        address _optionPricing,
-        address _volatilityOracle,
-        address _priceOracle,
+        uint256 _baseDecimals,
+        uint256 _quoteDecimals,
         address _uniswapV3Router,
         address _gmxHelper,
-        uint256 _minimumMargin,
-        address _insuranceFund
+        Configuration memory config
     ) {
         require(_base != address(0), "Invalid base token");
         require(_quote != address(0), "Invalid quote token");
-        require(_optionPricing != address(0), "Invalid option pricing");
-        require(_volatilityOracle != address(0), "Invalid volatility oracle");
-        require(_priceOracle != address(0), "Invalid price oracle");
-        require(_insuranceFund != address(0), "Invalid insurance fund");
 
         base = IERC20(_base);
         quote = IERC20(_quote);
-        optionPricing = IOptionPricing(_optionPricing);
-        volatilityOracle = IVolatilityOracle(_volatilityOracle);
-        priceOracle = IPriceOracle(_priceOracle);
+        baseDecimals = _baseDecimals;
+        quoteDecimals = _quoteDecimals;
         uniswapV3Router = IUniswapV3Router(_uniswapV3Router);
         gmxHelper = IGmxHelper(_gmxHelper);
-        minimumMargin = _minimumMargin;
-        insuranceFund = _insuranceFund;
+
+        maxSize = config.maxSize;
+        maxOpenInterest = config.maxOpenInterest;
+        optionPricing = config.optionPricing;
+        volatilityOracle = config.volatilityOracle;
+        priceOracle = config.priceOracle;
+        insuranceFund = config.insuranceFund;
+        minimumMargin = config.minimumMargin;
+        feeOpenPosition = config.feeOpenPosition;
+        minimumAbsoluteLiquidationThreshold = config.minimumAbsoluteLiquidationThreshold;
+        withdrawTimeout = config.withdrawTimeout;
 
         scalpPositionMinter = new ScalpPositionMinter();
 
@@ -212,13 +249,15 @@ contract OptionScalp is Ownable, Pausable {
     // Deposit assets
     // @param isQuote If true user deposits quote token (else base)
     // @param amount Amount of quote asset to deposit to LP
-    function deposit(bool isQuote, uint256 amount) public returns (uint256 shares) {
+    function deposit(address receiver, bool isQuote, uint256 amount) nonReentrant public returns (uint256 shares)  {
+        _isEligibleSender();
+
         if (isQuote) {
-            quote.transferFrom(msg.sender, address(this), amount);
-            shares = quoteLp.deposit(amount, msg.sender);
+            quote.safeTransferFrom(msg.sender, address(this), amount);
+            shares = quoteLp.deposit(amount, receiver);
         } else {
-            base.transferFrom(msg.sender, address(this), amount);
-            shares = baseLp.deposit(amount, msg.sender);
+            base.safeTransferFrom(msg.sender, address(this), amount);
+            shares = baseLp.deposit(amount, receiver);
         }
 
         emit Deposit(isQuote, amount, msg.sender);
@@ -228,6 +267,8 @@ contract OptionScalp is Ownable, Pausable {
     // @param isQuote If true user withdraws quote token (else base)
     // @param amount Amount of LP positions to withdraw
     function withdraw(bool isQuote, uint256 amount) public returns (uint256 assets) {
+        _isEligibleSender();
+
         if (isQuote) {
             assets = quoteLp.redeem(amount, msg.sender, msg.sender);
         } else {
@@ -240,18 +281,22 @@ contract OptionScalp is Ownable, Pausable {
     }
 
     /// @notice Opens a position against/in favour of the base asset (if you short base is swapped to quote)
-    /// @param size Size is ie8
+    /// @param size Size of position (quoteDecimals)
     /// @param timeframeIndex Position of the array
     /// @param margin Collateral posted by user
+    /// @param entryLimit Minimum or maximum entry price (for short or long)
     function openPosition(
         bool isShort,
         uint256 size,
         uint256 timeframeIndex,
-        uint256 margin
-    ) public returns (uint256 id) {
+        uint256 margin,
+        uint256 entryLimit
+    ) nonReentrant public returns (uint256 id, uint256 entry) {
+        _isEligibleSender();
+
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
         require(margin >= minimumMargin, "Insufficient margin");
-        require(size <= maxSize, "Your size is too big");
+        require(size <= maxSize, "Position exposure is too high");
         require(
             size + openInterest[isShort] <= maxOpenInterest,
             "OI is too high"
@@ -269,29 +314,30 @@ contract OptionScalp is Ownable, Pausable {
         );
 
         // Calculate opening fees in quote
-        uint256 openingFees = calcFees(size / 10**2);
+        uint256 openingFees = calcFees(size);
 
         // We transfer margin + premium + fees from user
-        quote.transferFrom(
+        quote.safeTransferFrom(
             msg.sender,
             address(this),
             margin + premium + openingFees
         );
 
         uint256 swapped;
-        uint256 entry;
 
         if (isShort) {
             // base to quote
             swapped = _swapExactOut(
                 address(base),
                 address(quote),
-                size / 10**2
+                size
             );
 
-            // size is ie8, swapped is ie18
-            // 1e18 * ie8 / ie18 = ie8
-            entry = ((10**18) * size) / swapped;
+            // size is quoteDecimals, swapped is baseDecimals
+            // baseDecimals * quoteDecimals / (baseDecimals) = quoteDecimals
+            entry = ((10 ** baseDecimals) * size) / swapped;
+
+            require(entry >= entryLimit, "Slippage");
 
             require(
                 baseLp.totalAvailableAssets() >= swapped,
@@ -302,17 +348,19 @@ contract OptionScalp is Ownable, Pausable {
         } else {
             // quote to base
             require(
-                quoteLp.totalAvailableAssets() >= size / 10**2,
+                quoteLp.totalAvailableAssets() >= size,
                 "Insufficient liquidity"
             );
 
-            swapped = _swapExactIn(address(quote), address(base), size / 10**2);
+            swapped = _swapExactIn(address(quote), address(base), size);
 
-            // size is ie8, swapped is ie18
-            // 1e18 * ie8 / ie18 = ie8
-            entry = ((10**18) * size) / swapped;
+            // size is quoteDecimals, swapped is baseDecimals
+            // baseDecimals * quoteDecimals / baseDecimals = quoteDecimals
+            entry = ((10 ** baseDecimals) * size) / swapped;
 
-            quoteLp.lockLiquidity(size / 10**2);
+            require(entry <= entryLimit, "Slippage");
+
+            quoteLp.lockLiquidity(size);
         }
 
         // Transfer fees to Insurance fund
@@ -342,9 +390,9 @@ contract OptionScalp is Ownable, Pausable {
             isOpen: true,
             isShort: isShort,
             size: size,
-            positions: (size * divisor) / entry,
-            amountBorrowed: isShort ? swapped : size / 10**2,
-            amountOut: isShort ? size / 10**2 : swapped,
+            positions: (size * (10 ** quoteDecimals)) / entry,
+            amountBorrowed: isShort ? swapped : size,
+            amountOut: isShort ? size : swapped,
             entry: entry,
             margin: margin,
             premium: premium,
@@ -360,20 +408,27 @@ contract OptionScalp is Ownable, Pausable {
     /// @notice Closes an open position
     /// @param id ID of position
     function closePosition(uint256 id) public {
+        _isEligibleSender();
+
         require(scalpPositions[id].isOpen, "Invalid position ID");
-        require(scalpPositions[id].openedAt + 10 seconds <= block.timestamp,
-            "Position must be open for at least 10 seconds"
+        require(scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
+            "Position must be open for at least 1 second"
         );
 
-        if (!isLiquidatable(id))
+        address owner = IERC721(scalpPositionMinter).ownerOf(id);
+
+        if (!isLiquidatable(id) && msg.sender != owner)
             require(
                 block.timestamp >=
                     scalpPositions[id].openedAt + scalpPositions[id].timeframe,
-                "Keeper can only close from an window before expiry"
+                "Keeper can only close after expiry"
             );
 
         uint256 swapped;
         uint256 traderWithdraw;
+
+        scalpPositions[id].isOpen = false;
+        scalpPositionMinter.burn(id);
 
         if (scalpPositions[id].isShort) {
             // quote to base
@@ -393,8 +448,8 @@ contract OptionScalp is Ownable, Pausable {
                     swapped - scalpPositions[id].amountBorrowed
                 );
 
-                quote.transfer(
-                    isLiquidatable(id) ? insuranceFund : IERC721(scalpPositionMinter).ownerOf(id),
+                quote.safeTransfer(
+                    isLiquidatable(id) ? insuranceFund : owner,
                     traderWithdraw
                 );
             } else {
@@ -419,8 +474,8 @@ contract OptionScalp is Ownable, Pausable {
                     swapped -
                     scalpPositions[id].amountBorrowed;
 
-                quote.transfer(
-                    isLiquidatable(id) ? insuranceFund : IERC721(scalpPositionMinter).ownerOf(id),
+                quote.safeTransfer(
+                    isLiquidatable(id) ? insuranceFund : owner,
                     traderWithdraw
                 );
             } else {
@@ -429,7 +484,9 @@ contract OptionScalp is Ownable, Pausable {
         }
 
         openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
-        scalpPositions[id].isOpen = false;
+        scalpPositions[id].pnl = int256(traderWithdraw) - int256(scalpPositions[id].margin + scalpPositions[id].premium + scalpPositions[id].fees);
+        cumulativePnl[owner] += scalpPositions[id].pnl;
+        cumulativeVolume[owner] += scalpPositions[id].size;
 
         emit ClosePosition(id, int256(traderWithdraw), msg.sender);
     }
@@ -437,32 +494,34 @@ contract OptionScalp is Ownable, Pausable {
     /// @notice Returns whether an open position is liquidatable
     function isLiquidatable(uint256 id) public view returns (bool) {
         return int256(scalpPositions[id].margin) + calcPnl(id) <=
-            (int256(minimumAbsoluteLiquidationThreshold) *
-                int256(scalpPositions[id].positions)) / 10**8;
+            int256(minimumAbsoluteLiquidationThreshold *
+                (scalpPositions[id].positions / (10 ** quoteDecimals)));
     }
 
     /// @notice Get liquidation price
     /// @param id Identifier of the position
     function getLiquidationPrice(uint256 id) public view returns (uint256 price) {
-        int256 threshold = int256(scalpPositions[id].margin) - (int256(minimumAbsoluteLiquidationThreshold) * int256(scalpPositions[id].positions)) / 10**8;
+        require(scalpPositions[id].isOpen, "Position is not open");
+
+        int256 threshold = int256(scalpPositions[id].margin) - int256(minimumAbsoluteLiquidationThreshold * scalpPositions[id].positions / (10 ** quoteDecimals));
 
         if (scalpPositions[id].isShort) {
-          price = scalpPositions[id].entry + (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
+          price = scalpPositions[id].entry + ((10 ** quoteDecimals) * uint(threshold) / scalpPositions[id].positions); // (quoteDecimals)
         } else {
-          price = scalpPositions[id].entry - (divisor * (uint(threshold) * 10 ** 2) / scalpPositions[id].positions); // ie8
+          price = scalpPositions[id].entry - ((10 ** quoteDecimals) * uint(threshold) / scalpPositions[id].positions); // (quoteDecimals)
         }
     }
 
     /// @notice Allow only scalp LP contract to claim collateral
     /// @param amount Amount of quote/base assets to transfer
-    function claimCollateral(uint256 amount) public {
+    function claimCollateral(uint256 amount) nonReentrant public {
         require(
             msg.sender == address(quoteLp) || msg.sender == address(baseLp),
             "Only Scalp LP contract can claim collateral"
         );
-        if (msg.sender == address(quoteLp)) quote.transfer(msg.sender, amount);
+        if (msg.sender == address(quoteLp)) quote.safeTransfer(msg.sender, amount);
         else if (msg.sender == address(baseLp))
-            base.transfer(msg.sender, amount);
+            base.safeTransfer(msg.sender, amount);
     }
 
     /// @notice External function to return the volatility
@@ -493,8 +552,6 @@ contract OptionScalp is Ownable, Pausable {
                 getVolatility(strike)
             )
         ) * size) / strike); // ATM options: does not matter if call or put
-
-        premium = premium / (divisor / uint256(10**quote.decimals()));
     }
 
     /// @notice Internal function to calculate fees
@@ -505,7 +562,7 @@ contract OptionScalp is Ownable, Pausable {
 
     /// @notice Internal function to calculate pnl
     /// @param id ID of position
-    /// @dev positions is ie8, entry is ie8, markPrice is ie8, pnl is ie6
+    /// @dev positions is quoteDecimals, entry is quoteDecimals, markPrice is quoteDecimals, pnl is quoteDecimals
     function calcPnl(uint256 id) public view returns (int256 pnl) {
         uint256 markPrice = getMarkPrice();
 
@@ -513,18 +570,18 @@ contract OptionScalp is Ownable, Pausable {
             pnl =
                 (int256(scalpPositions[id].positions) *
                     (int256(scalpPositions[id].entry) - int256(markPrice))) /
-                10**10;
+                int256(10 ** quoteDecimals);
         else
             pnl =
                 (int256(scalpPositions[id].positions) *
                     (int256(markPrice) - int256(scalpPositions[id].entry))) /
-                10**10;
+                int256(10 ** quoteDecimals);
     }
 
     /// @notice Public function to retrieve price of base asset from oracle
-    /// @param price Mark price
+    /// @param price Mark price (quoteDecimals)
     function getMarkPrice() public view returns (uint256 price) {
-        price = uint256(priceOracle.getUnderlyingPrice());
+        price = uint256(priceOracle.getUnderlyingPrice()) / 10 ** 2;
     }
 
     /// @notice Returns the tokenIds owned by a wallet
@@ -546,14 +603,21 @@ contract OptionScalp is Ownable, Pausable {
           ++start;
           ++idx;
       }
-  }
+    }
 
-    /// @notice Owner-only function to update maxSize and maxOpenInterest
-    /// @param newMaxSize ie8
-    /// @param newMaxOpenInterest ie8
-    function updateConfig(uint256 newMaxSize, uint256 newMaxOpenInterest) onlyOwner external {
-        maxSize = newMaxSize;
-        maxOpenInterest = newMaxOpenInterest;
+    /// @notice Owner-only function to update config
+    /// @param config Valid configuration struct
+    function updateConfig(Configuration calldata config) onlyOwner public {
+        maxSize = config.maxSize;
+        maxOpenInterest = config.maxOpenInterest;
+        optionPricing = config.optionPricing;
+        volatilityOracle = config.volatilityOracle;
+        priceOracle = config.priceOracle;
+        insuranceFund = config.insuranceFund;
+        minimumMargin = config.minimumMargin;
+        feeOpenPosition = config.feeOpenPosition;
+        minimumAbsoluteLiquidationThreshold = config.minimumAbsoluteLiquidationThreshold;
+        withdrawTimeout = config.withdrawTimeout;
     }
 
     /// @notice Transfers all funds to msg.sender

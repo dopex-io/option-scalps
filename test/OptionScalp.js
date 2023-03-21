@@ -55,13 +55,22 @@ describe("Option scalp", function() {
     optionScalp = await OptionScalp.deploy(
       weth.address,
       usdc.address,
-      optionPricing.address,
-      volatilityOracle.address,
-      priceOracle.address,
+      18,
+      6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
-      "10000000", // $10
-       "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13" // Insurace fund
+      [
+          "100000000000",  // $100.000
+          "10000000000000",  // $10M
+          optionPricing.address,
+          volatilityOracle.address,
+          priceOracle.address,
+          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+          "10000000", // $10
+          "5000000", // 0.05%
+          "5000000",  // $5
+          "1" // 1 second
+      ]
     );
 
     // Base LP
@@ -111,10 +120,10 @@ describe("Option scalp", function() {
     await usdc.connect(user0).approve(optionScalp.address, "10000000000");
     await weth.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("10.0"));
 
-    await expect(optionScalp.connect(user0).deposit(true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    await expect(optionScalp.connect(user0).deposit(user0.address, true, "100000000000000000000000")).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
-    await optionScalp.connect(user0).deposit(true, "10000000000");
-    await optionScalp.connect(user0).deposit(false, ethers.utils.parseEther("10.0"));
+    await optionScalp.connect(user0).deposit(user0.address, true, "10000000000");
+    await optionScalp.connect(user0).deposit(user0.address, false, ethers.utils.parseEther("10.0"));
   });
 
   it("user 0 withdraws half", async function() {
@@ -141,7 +150,7 @@ describe("Option scalp", function() {
     expect(startQuoteBalance).to.eq('10000000000');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "20000000"); // 5000$ long
+    await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "20000000", "0"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
     expect(quoteBalance).to.eq('9952500000');
@@ -204,6 +213,8 @@ describe("Option scalp", function() {
 
     expect((await optionScalp.isLiquidatable(0))).to.eq(false);
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(0);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -223,7 +234,7 @@ describe("Option scalp", function() {
     expect(startQuoteBalance).to.eq('10091978397');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "500000000"); // 5000$ short
+    await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "500000000", "0"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
     expect(quoteBalance).to.eq('9564478397');
@@ -286,6 +297,8 @@ describe("Option scalp", function() {
 
     expect((await optionScalp.isLiquidatable(1))).to.eq(false);
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(1);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -320,7 +333,7 @@ describe("Option scalp", function() {
     expect(actualPrice).to.eq("126114886400"); // $1261.14
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "500000000");
+    await optionScalp.connect(user1).openPosition(false, "5000000000", 0, "500000000", "130563345200");
 
     await usdc.connect(bf5).approve(uniV3Router.address, "1500000000000");
 
@@ -350,12 +363,14 @@ describe("Option scalp", function() {
         }
     )).mul(BigNumber.from("100"));
 
-    expect(actualPrice).to.eq("130563345200"); // $1305.63
+    expect(actualPrice).to.eq("130563345200"); // $1305.56
 
     await priceOracle.updateUnderlyingPrice("130563344300");
 
     // price pumps from 1261.14 to 1305.63 = -$44.49
     // size was $5000 so positions is 5000 / 1261.14 = 3.96, expected profit is 3.96 * 44.49 = $176.18
+
+    await network.provider.send("evm_increaseTime", [10]);
 
     await optionScalp.connect(user1).closePosition(2);
 
@@ -390,7 +405,7 @@ describe("Option scalp", function() {
     expect(actualPrice).to.eq("130543299900"); // $1305.43
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "2500000000");
+    await optionScalp.connect(user1).openPosition(false, "5000000000", 0, "2500000000", "130786171127");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("900.0"));
 
@@ -429,6 +444,8 @@ describe("Option scalp", function() {
     // price pumps from 1305.43 to 1275.74 = -$29.69
     // size was $5000 so positions is 5000 / 1305.43 = 3.83, expected profit is 3.83 * -29.69 = -$113.71
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(3);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
@@ -447,7 +464,7 @@ describe("Option scalp", function() {
     expect(startQuoteBalance).to.eq('10036438021');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "32000000"); // 5000$ short
+    await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "32000000", "0"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
     expect(quoteBalance).to.eq('9982341557');
@@ -508,6 +525,8 @@ describe("Option scalp", function() {
 
     await priceOracle.updateUnderlyingPrice("128218539300");
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(4);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -516,7 +535,7 @@ describe("Option scalp", function() {
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
-    // -32$ margin - 19.59$ of premium - 2.5$ of fees = $54.09
+    // -32$ margin - 19.95$ of premium - 2.5$ of fees = $54.45
     expect(profit).to.eq("-54096464");
   });
 
@@ -540,7 +559,7 @@ describe("Option scalp", function() {
     expect(actualPrice).to.eq("128228284900"); // $1282.28
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "120000000");
+    await optionScalp.connect(user1).openPosition(false, "5000000000", 0, "120000000", "129249311600");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("900.0"));
 
@@ -579,6 +598,8 @@ describe("Option scalp", function() {
 
     await priceOracle.updateUnderlyingPrice("125249327600");
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.closePosition(5);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
@@ -595,7 +616,7 @@ describe("Option scalp", function() {
     expect(startQuoteBalance).to.eq('9840343597');
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(true, "500000000000", 0, "30000000"); // 5000$ short
+    await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "30000000", "0"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
     expect(quoteBalance).to.eq('9787883411');
@@ -656,6 +677,8 @@ describe("Option scalp", function() {
 
     await priceOracle.updateUnderlyingPrice("125952385100");
 
+    await network.provider.send("evm_increaseTime", [10]);
+
     await optionScalp.connect(user1).closePosition(6);
 
     quoteBalance = await usdc.balanceOf(user1.address);
@@ -688,7 +711,7 @@ describe("Option scalp", function() {
     expect(actualPrice).to.eq("125968228800"); // $1259.68
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(false, "500000000000", 0, "90000000");
+    await optionScalp.connect(user1).openPosition(false, "5000000000", 0, "90000000", "126268720400");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
 
@@ -725,9 +748,11 @@ describe("Option scalp", function() {
     // price pumps from 1259.68 to 1241.68 = -$18
     // size was $5000 so positions is 5000 / 1259.68 = 3.96, expected profit is 3.96 * -18 = -$71.28
 
-    expect((await optionScalp.getLiquidationPrice(7))).to.eq("124334299773");
+    expect((await optionScalp.getLiquidationPrice(7))).to.eq("1243342994");
 
     await priceOracle.updateUnderlyingPrice("124168720400");
+
+    await network.provider.send("evm_increaseTime", [10]);
 
     await optionScalp.closePosition(7);
 
@@ -788,9 +813,9 @@ describe("Option scalp", function() {
     expect(actualPrice).to.eq("124154866100"); // $1241.54
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
-    await optionScalp.connect(user1).openPosition(false, "100000000000", 0, "150000000");
+    await optionScalp.connect(user1).openPosition(false, "1000000000", 0, "150000000", "124282270632");
 
-    expect(await optionScalp.getLiquidationPrice(8)).to.eq("106139929798");
+    expect(await optionScalp.getLiquidationPrice(8)).to.eq("1061399070");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
 
@@ -840,28 +865,56 @@ describe("Option scalp", function() {
   });
 
   it("update max size and max open interest", async function() {
-    await optionScalp.updateConfig("1000000000000", "1500000000000");
+    await optionScalp.updateConfig([
+        "10000000000",  // $10k
+        "12000000000",  // $12k
+         optionPricing.address,
+         volatilityOracle.address,
+         priceOracle.address,
+         "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+         "10000000", // $10
+         "5000000", // 0.05%
+         "5000000",  // $5
+         "60" // 1 minute
+    ]);
   });
 
   it("user 1 cannot open position larger than max size", async function() {
-    await expect(optionScalp.connect(user1).openPosition(true, "1500000000000", 0, "150000000")).to.be.revertedWith("Your size is too big");
+      await expect(optionScalp.connect(user1).openPosition(true, "15000000000", 0, "150000000", "0")).to.be.revertedWith("Your size is too big");
   });
 
   it("user 1 cannot open position when exceeding max open interest", async function() {
-      await optionScalp.connect(user1).openPosition(true, "800000000000", 0, "150000000");
-      await expect(optionScalp.connect(user1).openPosition(true, "800000000000", 0, "150000000")).to.be.revertedWith("OI is too high");
+      await optionScalp.updateConfig([
+            "10000000000",  // $10k
+            "1000000000",  // $1k
+             optionPricing.address,
+             volatilityOracle.address,
+             priceOracle.address,
+             "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+             "10000000", // $10
+             "5000000", // 0.05%
+             "5000000",  // $5
+             "60" // 1 minute
+      ]);
+      await expect(optionScalp.connect(user1).openPosition(true, "1500000000", 0, "150000000", "0")).to.be.revertedWith("OI is too high");
+  });
+
+  it("user 1 can open position with leverage 1x", async function() {
+       await optionScalp.connect(user1).openPosition(true, "150000000", 0, "150000000", "0");
+       expect((await optionScalp.getLiquidationPrice(9))).to.eq(2477083906);
   });
 
   it("get positions of user 1", async function() {
+      // if we burn tokens we find nothing here
       const positions = await optionScalp.connect(user1).positionsOfOwner(user1.address);
-      expect(positions[2]).to.eq(2);
+      expect(positions[0]).to.eq(9);
   });
 
   it("pre emergency withdraw", async function() {
       const usdcScalpBalance = await usdc.balanceOf(optionScalp.address);
       const wethScalpBalance = await weth.balanceOf(optionScalp.address);
-      expect(usdcScalpBalance).to.eq("8159137748");
-      expect(wethScalpBalance).to.eq("636343371256635363");
+      expect(usdcScalpBalance).to.eq("309137748");
+      expect(wethScalpBalance).to.eq("6933632223767943623");
 
       const owner = await optionScalp.owner();
 
@@ -883,7 +936,7 @@ describe("Option scalp", function() {
 
       const usdcOwnerBalance = await usdc.balanceOf(owner);
       const wethOwnerBalance = await weth.balanceOf(owner);
-      expect(usdcOwnerBalance).to.eq("8159137748");
-      expect(wethOwnerBalance).to.eq("636343371256635363");
+      expect(usdcOwnerBalance).to.eq("309137748");
+      expect(wethOwnerBalance).to.eq("6933632223767943623");
   });
 });

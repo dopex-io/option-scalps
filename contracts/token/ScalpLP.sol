@@ -11,6 +11,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {OptionScalp} from '../OptionScalp.sol';
 
+
 /**
  * @title Scalp LP Token
  */
@@ -35,6 +36,9 @@ contract ScalpLP is ERC4626 {
 
     // @dev Locked liquidity in active scalp positions
     uint public _lockedLiquidity;
+
+    // @dev Transfer freezing after a new deposit (user -> time)
+    mapping(address => uint256) public lockedUsers;
 
     /*==== CONSTRUCTOR ====*/
     /**
@@ -66,6 +70,75 @@ contract ScalpLP is ERC4626 {
         returns (string memory)
     {
         return string(abi.encodePacked(_a, _b));
+    }
+
+    function deposit(uint256 assets, address receiver) public virtual override returns (uint256 shares) {
+        // Check for rounding error since we round down in previewDeposit.
+        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+
+        // Need to transfer before minting or ERC777s could reenter.
+        asset.safeTransferFrom(msg.sender, address(this), assets);
+
+        _mint(receiver, shares);
+
+        lockedUsers[receiver] = block.timestamp + scalp.withdrawTimeout();
+
+        emit Deposit(msg.sender, receiver, assets, shares);
+
+        afterDeposit(assets, shares);
+    }
+
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner
+    ) public virtual override returns (uint256 shares) {
+        require(lockedUsers[owner] <= block.timestamp, "Cooling period");
+
+        shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
+
+        if (msg.sender != owner) {
+            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
+
+            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
+        }
+
+        beforeWithdraw(assets, shares);
+
+        _burn(owner, shares);
+
+        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+
+        asset.safeTransfer(receiver, assets);
+    }
+
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner
+    ) public virtual override returns (uint256 assets) {
+        require(lockedUsers[owner] <= block.timestamp, "Cooling period");
+
+        if (msg.sender != owner) {
+            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
+
+            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
+        }
+
+        // Check for rounding error since we round down in previewRedeem.
+        require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
+
+        beforeWithdraw(assets, shares);
+
+        _burn(owner, shares);
+
+        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+
+        asset.safeTransfer(receiver, assets);
+    }
+
+    function _beforeTokenTransfer(address from, address, uint256) internal virtual {
+        require(lockedUsers[from] <= block.timestamp, "Cooling period");
     }
 
     function totalAssets() public view virtual override returns (uint) {
