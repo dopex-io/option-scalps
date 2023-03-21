@@ -501,6 +501,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     /// @notice Get liquidation price
     /// @param id Identifier of the position
     function getLiquidationPrice(uint256 id) public view returns (uint256 price) {
+        require(scalpPositions[id].isOpen, "Position is not open");
+
         int256 threshold = int256(scalpPositions[id].margin) - int256(minimumAbsoluteLiquidationThreshold * scalpPositions[id].positions / (10 ** quoteDecimals));
 
         if (scalpPositions[id].isShort) {

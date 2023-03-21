@@ -899,17 +899,22 @@ describe("Option scalp", function() {
       await expect(optionScalp.connect(user1).openPosition(true, "1500000000", 0, "150000000", "0")).to.be.revertedWith("OI is too high");
   });
 
+  it("user 1 can open position with leverage 1x", async function() {
+       await optionScalp.connect(user1).openPosition(true, "150000000", 0, "150000000", "0");
+       expect((await optionScalp.getLiquidationPrice(9))).to.eq(2477083906);
+  });
+
   it("get positions of user 1", async function() {
       // if we burn tokens we find nothing here
       const positions = await optionScalp.connect(user1).positionsOfOwner(user1.address);
-      expect(positions[0]).to.eq(undefined);
+      expect(positions[0]).to.eq(9);
   });
 
   it("pre emergency withdraw", async function() {
       const usdcScalpBalance = await usdc.balanceOf(optionScalp.address);
       const wethScalpBalance = await weth.balanceOf(optionScalp.address);
-      expect(usdcScalpBalance).to.eq("9137748");
-      expect(wethScalpBalance).to.eq("7053951747354982740");
+      expect(usdcScalpBalance).to.eq("309137748");
+      expect(wethScalpBalance).to.eq("6933632223767943623");
 
       const owner = await optionScalp.owner();
 
@@ -931,7 +936,7 @@ describe("Option scalp", function() {
 
       const usdcOwnerBalance = await usdc.balanceOf(owner);
       const wethOwnerBalance = await weth.balanceOf(owner);
-      expect(usdcOwnerBalance).to.eq("9137748");
-      expect(wethOwnerBalance).to.eq("7053951747354982740");
+      expect(usdcOwnerBalance).to.eq("309137748");
+      expect(wethOwnerBalance).to.eq("6933632223767943623");
   });
 });
