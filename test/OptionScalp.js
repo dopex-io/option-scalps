@@ -59,16 +59,16 @@ describe("Option scalp", function () {
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
       [
-        "100000000000", // $100.000
-        "10000000000000", // $10M
-        optionPricing.address,
-        volatilityOracle.address,
-        priceOracle.address,
-        "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
-        "10000000", // $104
-        "5000000", // 0.05%
-        "5000000", // $5
-        "1", // 1 second
+          "100000000000",  // $100.000
+          "10000000000000",  // $10M
+          optionPricing.address,
+          volatilityOracle.address,
+          priceOracle.address,
+          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+          "10000000", // $10
+          "5000000", // 0.05%
+          "5000000",  // $5
+          "1" // 1 second
       ]
     );
 
@@ -80,6 +80,8 @@ describe("Option scalp", function () {
 
     // Keeper
     keeper = await (await ethers.getContractFactory("Keeper")).deploy();
+
+    await optionScalp.addToContractWhitelist(keeper.address);
 
     console.log("deployed option scalp:", optionScalp.address);
   });
@@ -866,7 +868,7 @@ describe("Option scalp", function () {
   });
 
   it("user 1 cannot open position larger than max size", async function() {
-      await expect(optionScalp.connect(user1).openPosition(true, "15000000000", 0, "150000000", "0")).to.be.revertedWith("Your size is too big");
+      await expect(optionScalp.connect(user1).openPosition(true, "15000000000", 0, "150000000", "0")).to.be.revertedWith("Position exposure is too high");
   });
 
   it("user 1 cannot open position when exceeding max open interest", async function() {
@@ -885,16 +887,22 @@ describe("Option scalp", function () {
       await expect(optionScalp.connect(user1).openPosition(true, "1500000000", 0, "150000000", "0")).to.be.revertedWith("OI is too high");
   });
 
+  it("user 1 can open position with leverage 1x", async function() {
+       await optionScalp.connect(user1).openPosition(true, "150000000", 0, "150000000", "0");
+       expect((await optionScalp.getLiquidationPrice(10))).to.eq(2477083906);
+  });
+
   it("get positions of user 1", async function() {
-    const positions = await optionScalp.connect(user1).positionsOfOwner(user0.address);
-      expect(positions[2]).to.eq(2);
+      // if we burn tokens we find nothing here
+      const positions = await optionScalp.connect(user1).positionsOfOwner(user1.address);
+      expect(positions[0]).to.eq(10);
   });
 
   it("pre emergency withdraw", async function() {
       const usdcScalpBalance = await usdc.balanceOf(optionScalp.address);
       const wethScalpBalance = await weth.balanceOf(optionScalp.address);
-      expect(usdcScalpBalance).to.eq("9137748");
-      expect(wethScalpBalance).to.eq("7053951747354982740");
+      expect(usdcScalpBalance).to.eq("309137748");
+      expect(wethScalpBalance).to.eq("6933632223767943623");
 
       const owner = await optionScalp.owner();
 
@@ -916,7 +924,7 @@ describe("Option scalp", function () {
 
       const usdcOwnerBalance = await usdc.balanceOf(owner);
       const wethOwnerBalance = await weth.balanceOf(owner);
-      expect(usdcOwnerBalance).to.eq("9137748");
-      expect(wethOwnerBalance).to.eq("7053951747354982740");
+      expect(usdcOwnerBalance).to.eq("309137748");
+      expect(wethOwnerBalance).to.eq("6933632223767943623");
   });
 });
