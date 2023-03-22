@@ -188,10 +188,10 @@ describe("Option scalp", function() {
     await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "20000000", "0"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9976221264');
+    expect(quoteBalance).to.eq('9976732757');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
-    expect(amountPaid).to.eq("23778736"); // 20$ of margin + 1.27$ of premium + 2.5$ of fees
+    expect(amountPaid).to.eq("23267243"); // 20$ of margin + 1.27$ of premium + 2.5$ of fees
   });
 
   it("should deploy option scalp WBTCUSD with oracles", async function() {
@@ -285,10 +285,10 @@ describe("Option scalp", function() {
     await optionScalp.connect(user1).openPosition(true, "1000000000000000000", 0, "100000000000000000", "0"); // 1 ETH long on BTC/ETH, 0.1 ETH of margin
 
     let quoteBalance = await weth.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('14899244252118136200');
+    expect(quoteBalance).to.eq('14899346551269203120');
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
-    expect(amountPaid).to.eq("100755747881863800"); // 0.1 ETH of margin + 0.000755747882 ETH of fees and premium
+    expect(amountPaid).to.eq("100653448730796880"); // 0.1 ETH of margin + 0.000755747882 ETH of fees and premium
 
     await weth.connect(b7b).deposit({value: ethers.utils.parseEther("260.0")});
     await weth.connect(b7b).approve(uniV3Router.address, ethers.utils.parseEther("1000.0"));
@@ -323,7 +323,7 @@ describe("Option scalp", function() {
 
     quoteBalance = await weth.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('14899244252118136200');
+    expect(quoteBalance).to.eq('14899346551269203120');
 
     actualPrice = (await uniV3Router.connect(b7b).callStatic.exactInputSingle(
         {
@@ -343,17 +343,17 @@ describe("Option scalp", function() {
     // price pumps from 1/0.06936534 to 1/0.06896032
     // size was 1 ETH so positions is 1 / (1/0.06936534) = 0.06936534, expected profit is 0.06936534 * -0.0846709986 = -0.00587323261 ETH
 
-    expect((await optionScalp.isLiquidatable(0))).to.eq(false);
+    expect((await optionScalp.isLiquidatable(1))).to.eq(false);
 
-    await optionScalp.connect(user1).closePosition(0);
+    await optionScalp.connect(user1).closePosition(1);
 
     quoteBalance = await weth.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('14992270585236757040');
+    expect(quoteBalance).to.eq('14992372883972932057');
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
-    expect(profit).to.eq("-7729414763242960"); // -0.100755748 ETH
+    expect(profit).to.eq("-7627116027067943"); // -0.100755748 ETH
   });
 
   it("user 0 withdraws all eth deposit with 0 pnl", async function() {
@@ -382,6 +382,6 @@ describe("Option scalp", function() {
 
     const difference = endBaseBalance.sub(startBaseBalance);
 
-    expect(difference).to.eq("400001773");
+    expect(difference).to.eq("400001063");
   });
 });

@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers, network } = require("hardhat");
 const { BigNumber } = ethers;
 
-describe("Option scalp", function() {
+describe("Option scalp", function () {
   let signers;
   let owner;
 
@@ -19,6 +19,7 @@ describe("Option scalp", function() {
   let bf5;
   let b50Address;
   let bf5Address;
+  let keeper;
 
   before(async () => {
     signers = await ethers.getSigners();
@@ -31,7 +32,7 @@ describe("Option scalp", function() {
     user3 = signers[4];
   });
 
-  it("should deploy option scalp", async function() {
+  it("should deploy option scalp", async function () {
     // USDC
     usdc = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8");
     // WETH
@@ -42,9 +43,7 @@ describe("Option scalp", function() {
     const PriceOracle = await ethers.getContractFactory("MockPriceOracle");
     priceOracle = await PriceOracle.deploy();
     // Volatility oracle
-    const VolatilityOracle = await ethers.getContractFactory(
-      "MockVolatilityOracle"
-    );
+    const VolatilityOracle = await ethers.getContractFactory("MockVolatilityOracle");
     volatilityOracle = await VolatilityOracle.deploy();
     // Option pricing
     const OptionPricing = await ethers.getContractFactory("MockOptionPricing");
@@ -74,15 +73,20 @@ describe("Option scalp", function() {
     );
 
     // Base LP
-    baseLp = (await ethers.getContractFactory("ScalpLP")).attach((await optionScalp.baseLp()));
+    baseLp = (await ethers.getContractFactory("ScalpLP")).attach(await optionScalp.baseLp());
 
     // Quote LP
-    quoteLp = (await ethers.getContractFactory("ScalpLP")).attach((await optionScalp.quoteLp()));
+    quoteLp = (await ethers.getContractFactory("ScalpLP")).attach(await optionScalp.quoteLp());
+
+    // Keeper
+    keeper = await (await ethers.getContractFactory("Keeper")).deploy();
+
+    await optionScalp.addToContractWhitelist(keeper.address);
 
     console.log("deployed option scalp:", optionScalp.address);
   });
 
-  it("distribute funds to user0, user1, user2 and user3", async function() {
+  it("distribute funds to user0, user1, user2 and user3", async function () {
     // Transfer USDC and WETH to our address from another impersonated address
     await network.provider.request({
       method: "hardhat_impersonateAccount",
@@ -97,26 +101,22 @@ describe("Option scalp", function() {
     b50Address = "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13";
     bf5Address = "0x9bf54297d9270730192a83EF583fF703599D9F18";
 
-    b50 = await ethers.provider.getSigner(
-      b50Address
-    );
+    b50 = await ethers.provider.getSigner(b50Address);
 
-    bf5 = await ethers.provider.getSigner(
-      bf5Address
-    );
+    bf5 = await ethers.provider.getSigner(bf5Address);
 
-    [user0, user1, user2, user3].map(async user => {
+    [user0, user1, user2, user3].map(async (user) => {
       await weth.connect(b50).transfer(user.address, ethers.utils.parseEther("10.0"));
       await usdc.connect(bf5).transfer(user.address, "10000000000");
 
       await b50.sendTransaction({
         to: user.address,
-        value: ethers.utils.parseEther("10.0")
+        value: ethers.utils.parseEther("10.0"),
       });
     });
   });
 
-  it("user 0 deposits", async function() {
+  it("user 0 deposits", async function () {
     await usdc.connect(user0).approve(optionScalp.address, "10000000000");
     await weth.connect(user0).approve(optionScalp.address, ethers.utils.parseEther("10.0"));
 
@@ -126,7 +126,7 @@ describe("Option scalp", function() {
     await optionScalp.connect(user0).deposit(user0.address, false, ethers.utils.parseEther("10.0"));
   });
 
-  it("user 0 withdraws half", async function() {
+  it("user 0 withdraws half", async function () {
     const scalpLpAddress = await optionScalp.connect(user0).quoteLp();
     quoteLp = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", scalpLpAddress);
     const balance = await quoteLp.balanceOf(user0.address);
@@ -135,7 +135,7 @@ describe("Option scalp", function() {
     // Allowance is required
     await quoteLp.connect(user0).approve(optionScalp.address, "1000000000000000000000000000000000");
 
-    await expect(optionScalp.connect(user0).withdraw(true, "10000000000000")).to.be.revertedWith('Not enough available assets to satisfy withdrawal');
+    await expect(optionScalp.connect(user0).withdraw(true, "10000000000000")).to.be.revertedWith("Not enough available assets to satisfy withdrawal");
 
     const startQuoteBalance = await usdc.balanceOf(user0.address);
     await optionScalp.connect(user0).withdraw(true, balance.div(2));
@@ -145,81 +145,79 @@ describe("Option scalp", function() {
     expect(quoteOut).to.eq("5000000000");
   });
 
-  it("user 1 opens a short scalp position, eth drops, position is closed", async function() {
+  it("user 1 opens a short scalp position, eth drops, position is closed", async function () {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10000000000');
+    expect(startQuoteBalance).to.eq("10000000000");
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "20000000", "0"); // 5000$ long
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9952500000');
+    expect(quoteBalance).to.eq("9952500000");
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
     expect(amountPaid).to.eq("47500000"); // 20$ of margin + 25$ of premium + 2.5$ of fees
 
-    await weth.connect(b50).deposit({value: ethers.utils.parseEther("260.0")});
+    await weth.connect(b50).deposit({ value: ethers.utils.parseEther("260.0") });
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1000.0"));
 
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    let actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("128555210800"); // $1285.55
 
-    await uniV3Router.connect(b50).exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("900.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
+    await uniV3Router.connect(b50).exactInputSingle({
+      tokenIn: weth.address,
+      tokenOut: usdc.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: ethers.utils.parseEther("900.0"),
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('9952500000');
+    expect(quoteBalance).to.eq("9952500000");
 
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("125353431000"); // $1253.53
 
     // price drops from 1285.67 to 1253.53 = $32.14
     // size was $5000 so positions is 5000 / 1285.55 = 3.88, expected profit is 3.88 * 32.14 = $124.70
 
-    expect((await optionScalp.isLiquidatable(0))).to.eq(false);
+    expect(await optionScalp.isLiquidatable(1)).to.eq(false);
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.connect(user1).closePosition(0);
+    await optionScalp.connect(user1).closePosition(1);
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('10091978397');
+    expect(quoteBalance).to.eq("10091978397");
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
@@ -229,15 +227,15 @@ describe("Option scalp", function() {
     expect(profit).to.eq("91978397"); // $91.97
   });
 
-  it("user 1 opens a short scalp position, eth pumps, position is closed", async function() {
+  it("user 1 opens a short scalp position, eth pumps, position is closed", async function () {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10091978397');
+    expect(startQuoteBalance).to.eq("10091978397");
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "500000000", "0"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9564478397');
+    expect(quoteBalance).to.eq("9564478397");
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
     expect(amountPaid).to.eq("527500000"); // 500$ of margin + 25$ of premium + 2.5$ of fees
@@ -247,46 +245,44 @@ describe("Option scalp", function() {
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1000000000.0"));
     await usdc.connect(bf5).approve(uniV3Router.address, "550000000000");
 
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    let actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("125353162800"); // $1253.53
 
-    await uniV3Router.connect(b50).exactInputSingle(
-        {
-          tokenIn: usdc.address,
-          tokenOut: weth.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: "250000000000",
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
+    await uniV3Router.connect(b50).exactInputSingle({
+      tokenIn: usdc.address,
+      tokenOut: weth.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: "250000000000",
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
 
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("126099007200"); // $1260.99
 
@@ -295,15 +291,15 @@ describe("Option scalp", function() {
     // price pumps from 1253.53 to 1260.99 = -$7.46
     // size was $5000 so positions is 5000 / 1253.53 = 3.98873581, expected profit is 3.98873581 * -7.46 = -$29.75
 
-    expect((await optionScalp.isLiquidatable(1))).to.eq(false);
+    expect(await optionScalp.isLiquidatable(2)).to.eq(false);
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.connect(user1).closePosition(1);
+    await optionScalp.connect(user1).closePosition(2);
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('10029186890');
+    expect(quoteBalance).to.eq("10029186890");
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
@@ -313,22 +309,22 @@ describe("Option scalp", function() {
     expect(profit).to.eq("-62791507"); // $62.79
   });
 
-  it("user 1 opens a long scalp position, eth pumps, position is closed", async function() {
+  it("user 1 opens a long scalp position, eth pumps, position is closed", async function () {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10029186890');
+    expect(startQuoteBalance).to.eq("10029186890");
 
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    let actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("126114886400"); // $1261.14
 
@@ -337,31 +333,29 @@ describe("Option scalp", function() {
 
     await usdc.connect(bf5).approve(uniV3Router.address, "1500000000000");
 
-    await uniV3Router.connect(bf5).exactInputSingle(
-        {
-          tokenIn: usdc.address,
-          tokenOut: weth.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: "1500000000000",
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
+    await uniV3Router.connect(bf5).exactInputSingle({
+      tokenIn: usdc.address,
+      tokenOut: weth.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: "1500000000000",
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
 
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("130563345200"); // $1305.56
 
@@ -372,10 +366,10 @@ describe("Option scalp", function() {
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.connect(user1).closePosition(2);
+    await optionScalp.connect(user1).closePosition(3);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('10177349876');
+    expect(quoteBalance).to.eq("10177349876");
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
@@ -385,22 +379,22 @@ describe("Option scalp", function() {
     expect(profit).to.eq("148162986"); // $148.16
   });
 
-  it("user 1 opens a long scalp position, eth drops, position is closed", async function() {
+  it("user 1 opens a long scalp position, eth drops, position is closed", async function () {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10177349876');
+    expect(startQuoteBalance).to.eq("10177349876");
 
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    let actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("130543299900"); // $1305.43
 
@@ -409,33 +403,31 @@ describe("Option scalp", function() {
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("900.0"));
 
-    await uniV3Router.connect(b50).exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("800.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
+    await uniV3Router.connect(b50).exactInputSingle({
+      tokenIn: weth.address,
+      tokenOut: usdc.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: ethers.utils.parseEther("800.0"),
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("900.0"));
 
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("127574029900"); // $1275.74
 
@@ -446,10 +438,10 @@ describe("Option scalp", function() {
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.connect(user1).closePosition(3);
+    await optionScalp.connect(user1).closePosition(4);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('10036438021');
+    expect(quoteBalance).to.eq("10036438021");
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
@@ -459,15 +451,15 @@ describe("Option scalp", function() {
     expect(profit).to.eq("-140911855"); // $140.91
   });
 
-  it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is enough", async function() {
+  it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is enough", async function () {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('10036438021');
+    expect(startQuoteBalance).to.eq("10036438021");
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "32000000", "0"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9982341557');
+    expect(quoteBalance).to.eq("9982341557");
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
     expect(amountPaid).to.eq("54096464"); // 32$ of margin + 19.59$ of premium + 2.5$ of fees
@@ -477,46 +469,44 @@ describe("Option scalp", function() {
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1000000000.0"));
     await usdc.connect(bf5).approve(uniV3Router.address, "550000000000");
 
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    let actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("127546184400"); // $1275.46
 
-    await uniV3Router.connect(b50).exactInputSingle(
-        {
-          tokenIn: usdc.address,
-          tokenOut: weth.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: "250000000000",
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
+    await uniV3Router.connect(b50).exactInputSingle({
+      tokenIn: usdc.address,
+      tokenOut: weth.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: "250000000000",
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
 
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("128218529500"); // $1282.18
 
@@ -527,11 +517,11 @@ describe("Option scalp", function() {
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.connect(user1).closePosition(4);
+    await optionScalp.connect(user1).closePosition(5);
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
-    expect(quoteBalance).to.eq('9982341557');
+    expect(quoteBalance).to.eq("9982341557");
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
@@ -539,22 +529,22 @@ describe("Option scalp", function() {
     expect(profit).to.eq("-54096464");
   });
 
-  it("user 1 opens a long scalp position, eth drops, position is liquidated and margin is not enough", async function() {
+  it("user 1 opens a long scalp position, eth drops, position is liquidated and margin is not enough", async function () {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('9982341557');
+    expect(startQuoteBalance).to.eq("9982341557");
 
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    let actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("128228284900"); // $1282.28
 
@@ -563,33 +553,31 @@ describe("Option scalp", function() {
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("900.0"));
 
-    await uniV3Router.connect(b50).exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("800.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
+    await uniV3Router.connect(b50).exactInputSingle({
+      tokenIn: weth.address,
+      tokenOut: usdc.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: ethers.utils.parseEther("800.0"),
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("900.0"));
 
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("125249311600"); // $1252.49
 
@@ -600,10 +588,10 @@ describe("Option scalp", function() {
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.closePosition(5);
+    await optionScalp.closePosition(6);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9840343597');
+    expect(quoteBalance).to.eq("9840343597");
 
     const profit = quoteBalance.sub(startQuoteBalance);
 
@@ -611,15 +599,15 @@ describe("Option scalp", function() {
     expect(profit).to.eq("-141997960"); // $141.99
   });
 
-  it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is not enough", async function() {
+  it("user 1 opens a short scalp position, eth pumps, position is liquidated and margin is not enough", async function () {
     const startQuoteBalance = await usdc.balanceOf(user1.address);
-    expect(startQuoteBalance).to.eq('9840343597');
+    expect(startQuoteBalance).to.eq("9840343597");
 
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(true, "5000000000", 0, "30000000", "0"); // 5000$ short
 
     let quoteBalance = await usdc.balanceOf(user1.address);
-    expect(quoteBalance).to.eq('9787883411');
+    expect(quoteBalance).to.eq("9787883411");
 
     const amountPaid = startQuoteBalance.sub(quoteBalance);
     expect(amountPaid).to.eq("52460186"); // 30$ of margin + 19.96$ of premium + 2.5$ of fees
@@ -629,46 +617,44 @@ describe("Option scalp", function() {
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("1000000000.0"));
     await usdc.connect(bf5).approve(uniV3Router.address, "550000000000");
 
-    let actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    let actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("125221355200"); // $1252.21
 
-    await uniV3Router.connect(b50).exactInputSingle(
-        {
-          tokenIn: usdc.address,
-          tokenOut: weth.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: "250000000000",
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    );
+    await uniV3Router.connect(b50).exactInputSingle({
+      tokenIn: usdc.address,
+      tokenOut: weth.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: "250000000000",
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
 
-    actualPrice = (await uniV3Router.connect(b50).callStatic.exactInputSingle(
-        {
-          tokenIn: weth.address,
-          tokenOut: usdc.address,
-          fee: 500,
-          recipient: b50Address,
-          deadline: "999999999999999999999999",
-          amountIn: ethers.utils.parseEther("1.0"),
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }
-    )).mul(BigNumber.from("100"));
+    actualPrice = (
+      await uniV3Router.connect(b50).callStatic.exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: usdc.address,
+        fee: 500,
+        recipient: b50Address,
+        deadline: "999999999999999999999999",
+        amountIn: ethers.utils.parseEther("1.0"),
+        amountOutMinimum: 1,
+        sqrtPriceLimitX96: 0,
+      })
+    ).mul(BigNumber.from("100"));
 
     expect(actualPrice).to.eq("125952367300"); // $1259.52
 
@@ -679,7 +665,9 @@ describe("Option scalp", function() {
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.connect(user1).closePosition(6);
+    let positions = await keeper.getCloseablePositions(0, 10, optionScalp.address);
+    positions = positions.filter((positionId) => !positionId.isZero());
+    await keeper.closePositions(positions, optionScalp.address);
 
     quoteBalance = await usdc.balanceOf(user1.address);
 
@@ -748,13 +736,13 @@ describe("Option scalp", function() {
     // price pumps from 1259.68 to 1241.68 = -$18
     // size was $5000 so positions is 5000 / 1259.68 = 3.96, expected profit is 3.96 * -18 = -$71.28
 
-    expect((await optionScalp.getLiquidationPrice(7))).to.eq("1243342994");
+    expect((await optionScalp.getLiquidationPrice(8))).to.eq("1243342994");
 
     await priceOracle.updateUnderlyingPrice("124168720400");
 
     await network.provider.send("evm_increaseTime", [10]);
 
-    await optionScalp.closePosition(7);
+    await optionScalp.closePosition(8);
 
     let quoteBalance = await usdc.balanceOf(user1.address);
     expect(quoteBalance).to.eq('9675534641');
@@ -815,7 +803,7 @@ describe("Option scalp", function() {
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(false, "1000000000", 0, "150000000", "124282270632");
 
-    expect(await optionScalp.getLiquidationPrice(8)).to.eq("1061399070");
+    expect(await optionScalp.getLiquidationPrice(9)).to.eq("1061399070");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
 
@@ -859,7 +847,7 @@ describe("Option scalp", function() {
   });
 
   it("user 1 closes long scalp position and user 0 withdraws remaining available liquidity", async function() {
-    await optionScalp.connect(user1).closePosition(8);
+    await optionScalp.connect(user1).closePosition(9);
 
     await optionScalp.connect(user0).withdraw(true, "3000000000");
   });
@@ -880,7 +868,7 @@ describe("Option scalp", function() {
   });
 
   it("user 1 cannot open position larger than max size", async function() {
-      await expect(optionScalp.connect(user1).openPosition(true, "15000000000", 0, "150000000", "0")).to.be.revertedWith("Your size is too big");
+      await expect(optionScalp.connect(user1).openPosition(true, "15000000000", 0, "150000000", "0")).to.be.revertedWith("Position exposure is too high");
   });
 
   it("user 1 cannot open position when exceeding max open interest", async function() {
@@ -901,13 +889,13 @@ describe("Option scalp", function() {
 
   it("user 1 can open position with leverage 1x", async function() {
        await optionScalp.connect(user1).openPosition(true, "150000000", 0, "150000000", "0");
-       expect((await optionScalp.getLiquidationPrice(9))).to.eq(2477083906);
+       expect((await optionScalp.getLiquidationPrice(10))).to.eq(2477083906);
   });
 
   it("get positions of user 1", async function() {
       // if we burn tokens we find nothing here
       const positions = await optionScalp.connect(user1).positionsOfOwner(user1.address);
-      expect(positions[0]).to.eq(9);
+      expect(positions[0]).to.eq(10);
   });
 
   it("pre emergency withdraw", async function() {

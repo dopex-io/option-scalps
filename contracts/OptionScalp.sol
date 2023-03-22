@@ -21,7 +21,6 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
-
 contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     using SafeERC20 for IERC20;
 
@@ -53,7 +52,13 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     // GMX Helper
     IGmxHelper public gmxHelper;
 
-    uint256[] public timeframes = [1 minutes, 5 minutes, 15 minutes, 30 minutes, 60 minutes];
+    uint256[] public timeframes = [
+        1 minutes,
+        5 minutes,
+        15 minutes,
+        30 minutes,
+        60 minutes
+    ];
 
     // Address of multisig which handles insurance fund
     address public insuranceFund;
@@ -182,7 +187,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         insuranceFund = config.insuranceFund;
         minimumMargin = config.minimumMargin;
         feeOpenPosition = config.feeOpenPosition;
-        minimumAbsoluteLiquidationThreshold = config.minimumAbsoluteLiquidationThreshold;
+        minimumAbsoluteLiquidationThreshold = config
+            .minimumAbsoluteLiquidationThreshold;
         withdrawTimeout = config.withdrawTimeout;
 
         scalpPositionMinter = new ScalpPositionMinter();
@@ -249,7 +255,11 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     // Deposit assets
     // @param isQuote If true user deposits quote token (else base)
     // @param amount Amount of quote asset to deposit to LP
-    function deposit(address receiver, bool isQuote, uint256 amount) nonReentrant public returns (uint256 shares)  {
+    function deposit(
+        address receiver,
+        bool isQuote,
+        uint256 amount
+    ) public nonReentrant returns (uint256 shares) {
         _isEligibleSender();
 
         if (isQuote) {
@@ -266,7 +276,10 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     // Withdraw
     // @param isQuote If true user withdraws quote token (else base)
     // @param amount Amount of LP positions to withdraw
-    function withdraw(bool isQuote, uint256 amount) public returns (uint256 assets) {
+    function withdraw(
+        bool isQuote,
+        uint256 amount
+    ) public returns (uint256 assets) {
         _isEligibleSender();
 
         if (isQuote) {
@@ -291,7 +304,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         uint256 timeframeIndex,
         uint256 margin,
         uint256 entryLimit
-    ) nonReentrant public returns (uint256 id, uint256 entry) {
+    ) public nonReentrant returns (uint256 id, uint256 entry) {
         _isEligibleSender();
 
         require(timeframeIndex < timeframes.length, "Invalid timeframe");
@@ -327,11 +340,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
         if (isShort) {
             // base to quote
-            swapped = _swapExactOut(
-                address(base),
-                address(quote),
-                size
-            );
+            swapped = _swapExactOut(address(base), address(quote), size);
 
             // size is quoteDecimals, swapped is baseDecimals
             // baseDecimals * quoteDecimals / (baseDecimals) = quoteDecimals
@@ -411,7 +420,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         _isEligibleSender();
 
         require(scalpPositions[id].isOpen, "Invalid position ID");
-        require(scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
+        require(
+            scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
             "Position must be open for at least 1 second"
         );
 
@@ -484,7 +494,13 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         }
 
         openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
-        scalpPositions[id].pnl = int256(traderWithdraw) - int256(scalpPositions[id].margin + scalpPositions[id].premium + scalpPositions[id].fees);
+        scalpPositions[id].pnl =
+            int256(traderWithdraw) -
+            int256(
+                scalpPositions[id].margin +
+                    scalpPositions[id].premium +
+                    scalpPositions[id].fees
+            );
         cumulativePnl[owner] += scalpPositions[id].pnl;
         cumulativeVolume[owner] += scalpPositions[id].size;
 
@@ -493,44 +509,58 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
     /// @notice Returns whether an open position is liquidatable
     function isLiquidatable(uint256 id) public view returns (bool) {
-        return int256(scalpPositions[id].margin) + calcPnl(id) <=
-            int256(minimumAbsoluteLiquidationThreshold *
-                (scalpPositions[id].positions / (10 ** quoteDecimals)));
+        return
+            int256(scalpPositions[id].margin) + calcPnl(id) <=
+            int256(
+                minimumAbsoluteLiquidationThreshold *
+                    (scalpPositions[id].positions / (10 ** quoteDecimals))
+            );
     }
 
     /// @notice Get liquidation price
     /// @param id Identifier of the position
-    function getLiquidationPrice(uint256 id) public view returns (uint256 price) {
-        require(scalpPositions[id].isOpen, "Position is not open");
+    function getLiquidationPrice(
+        uint256 id
+    ) public view returns (uint256 price) {
+        if(!scalpPositions[id].isOpen) return 0;
 
-        int256 threshold = int256(scalpPositions[id].margin) - int256(minimumAbsoluteLiquidationThreshold * scalpPositions[id].positions / (10 ** quoteDecimals));
+        int256 threshold = int256(scalpPositions[id].margin) -
+            int256(
+                (minimumAbsoluteLiquidationThreshold *
+                    scalpPositions[id].positions) / (10 ** quoteDecimals)
+            );
 
         if (scalpPositions[id].isShort) {
-          price = scalpPositions[id].entry + ((10 ** quoteDecimals) * uint(threshold) / scalpPositions[id].positions); // (quoteDecimals)
+            price =
+                scalpPositions[id].entry +
+                (((10 ** quoteDecimals) * uint(threshold)) /
+                    scalpPositions[id].positions); // (quoteDecimals)
         } else {
-          price = scalpPositions[id].entry - ((10 ** quoteDecimals) * uint(threshold) / scalpPositions[id].positions); // (quoteDecimals)
+            price =
+                scalpPositions[id].entry -
+                (((10 ** quoteDecimals) * uint(threshold)) /
+                    scalpPositions[id].positions); // (quoteDecimals)
         }
     }
 
     /// @notice Allow only scalp LP contract to claim collateral
     /// @param amount Amount of quote/base assets to transfer
-    function claimCollateral(uint256 amount) nonReentrant public {
+    function claimCollateral(uint256 amount) public nonReentrant {
         require(
             msg.sender == address(quoteLp) || msg.sender == address(baseLp),
             "Only Scalp LP contract can claim collateral"
         );
-        if (msg.sender == address(quoteLp)) quote.safeTransfer(msg.sender, amount);
+        if (msg.sender == address(quoteLp))
+            quote.safeTransfer(msg.sender, amount);
         else if (msg.sender == address(baseLp))
             base.safeTransfer(msg.sender, amount);
     }
 
     /// @notice External function to return the volatility
     /// @param strike Strike of option
-    function getVolatility(uint256 strike)
-        public
-        view
-        returns (uint256 volatility)
-    {
+    function getVolatility(
+        uint256 strike
+    ) public view returns (uint256 volatility) {
         volatility = uint256(volatilityOracle.getVolatility(strike));
     }
 
@@ -586,28 +616,29 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
     /// @notice Returns the tokenIds owned by a wallet
     /// @param owner wallet owner
-    function positionsOfOwner(address owner)
-        public
-        view
-        returns (uint256[] memory tokenIds)
-    {
-      uint256 ownerTokenCount = scalpPositionMinter.balanceOf(owner);
+    function positionsOfOwner(
+        address owner
+    ) public view returns (uint256[] memory tokenIds) {
+        uint256 ownerTokenCount = scalpPositionMinter.balanceOf(owner);
 
-      tokenIds = new uint256[](ownerTokenCount);
-      uint256 start;
-      uint256 idx;
+        tokenIds = new uint256[](ownerTokenCount);
+        uint256 start;
+        uint256 idx;
 
-      while (start < ownerTokenCount) {
-          uint256 tokenId = scalpPositionMinter.tokenOfOwnerByIndex(owner, idx);
-          tokenIds[start] = tokenId;
-          ++start;
-          ++idx;
-      }
+        while (start < ownerTokenCount) {
+            uint256 tokenId = scalpPositionMinter.tokenOfOwnerByIndex(
+                owner,
+                idx
+            );
+            tokenIds[start] = tokenId;
+            ++start;
+            ++idx;
+        }
     }
 
     /// @notice Owner-only function to update config
     /// @param config Valid configuration struct
-    function updateConfig(Configuration calldata config) onlyOwner public {
+    function updateConfig(Configuration calldata config) public onlyOwner {
         maxSize = config.maxSize;
         maxOpenInterest = config.maxOpenInterest;
         optionPricing = config.optionPricing;
@@ -616,7 +647,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         insuranceFund = config.insuranceFund;
         minimumMargin = config.minimumMargin;
         feeOpenPosition = config.feeOpenPosition;
-        minimumAbsoluteLiquidationThreshold = config.minimumAbsoluteLiquidationThreshold;
+        minimumAbsoluteLiquidationThreshold = config
+            .minimumAbsoluteLiquidationThreshold;
         withdrawTimeout = config.withdrawTimeout;
     }
 
@@ -624,7 +656,10 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     /// @dev Can only be called by the owner
     /// @param tokens The list of erc20 tokens to withdraw
     /// @param transferNative Whether should transfer the native currency
-    function emergencyWithdraw(address[] calldata tokens, bool transferNative) external onlyOwner {
+    function emergencyWithdraw(
+        address[] calldata tokens,
+        bool transferNative
+    ) external onlyOwner {
         if (transferNative) payable(msg.sender).transfer(address(this).balance);
 
         IERC20 token;
@@ -639,5 +674,23 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         }
 
         emit EmergencyWithdraw(msg.sender);
+    }
+
+    /**
+     * @notice Add a contract to the whitelist
+     * @dev    Can only be called by the owner
+     * @param _contract Address of the contract that needs to be added to the whitelist
+     */
+    function addToContractWhitelist(address _contract) external onlyOwner {
+        _addToContractWhitelist(_contract);
+    }
+
+    /**
+     * @notice Add a contract to the whitelist
+     * @dev    Can only be called by the owner
+     * @param _contract Address of the contract that needs to be added to the whitelist
+     */
+    function removeFromContractWhitelist(address _contract) external onlyOwner {
+        _removeFromContractWhitelist(_contract);
     }
 }
