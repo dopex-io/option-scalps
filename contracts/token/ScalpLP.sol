@@ -40,9 +40,6 @@ contract ScalpLP is ERC4626 {
     // @dev Transfer freezing after a new deposit (user -> time)
     mapping(address => uint256) public lockedUsers;
 
-    // AddProceeds event
-    event AddProceeds(uint256 proceeds);
-
     /*==== CONSTRUCTOR ====*/
     /**
      * @param _scalp The address of the scalp contract creating the lp token
@@ -166,8 +163,6 @@ contract ScalpLP is ERC4626 {
     function addProceeds(uint proceeds) public {
         require(msg.sender == address(scalp), "Only scalp can call this function");
         _totalAssets += proceeds;
-
-        emit AddProceeds(proceeds);
     }
 
     function beforeWithdraw(uint256 assets, uint256 /*shares*/ ) internal virtual override {
