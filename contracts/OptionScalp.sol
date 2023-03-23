@@ -19,7 +19,6 @@ import {IOptionPricing} from "./interface/IOptionPricing.sol";
 import {IVolatilityOracle} from "./interface/IVolatilityOracle.sol";
 import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
-import {IGmxHelper} from "./interface/IGmxHelper.sol";
 
 contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     using SafeERC20 for IERC20;
@@ -48,9 +47,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
     // Uniswap V3 router
     IUniswapV3Router public uniswapV3Router;
-
-    // GMX Helper
-    IGmxHelper public gmxHelper;
 
     uint256[] public timeframes = [
         1 minutes,
@@ -166,7 +162,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         uint256 _baseDecimals,
         uint256 _quoteDecimals,
         address _uniswapV3Router,
-        address _gmxHelper,
         Configuration memory config
     ) {
         require(_base != address(0), "Invalid base token");
@@ -177,7 +172,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         baseDecimals = _baseDecimals;
         quoteDecimals = _quoteDecimals;
         uniswapV3Router = IUniswapV3Router(_uniswapV3Router);
-        gmxHelper = IGmxHelper(_gmxHelper);
 
         maxSize = config.maxSize;
         maxOpenInterest = config.maxOpenInterest;
