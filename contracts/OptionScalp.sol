@@ -494,17 +494,12 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         }
 
         openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
-        scalpPositions[id].pnl =
-            int256(traderWithdraw) -
-            int256(
-                scalpPositions[id].margin +
-                    scalpPositions[id].premium +
-                    scalpPositions[id].fees
-            );
-        cumulativePnl[owner] += scalpPositions[id].pnl;
+        int256 pnl = int256(traderWithdraw) - int256(scalpPositions[id].margin + scalpPositions[id].premium + scalpPositions[id].fees);
+        scalpPositions[id].pnl = pnl;
+        cumulativePnl[owner] += pnl;
         cumulativeVolume[owner] += scalpPositions[id].size;
 
-        emit ClosePosition(id, int256(traderWithdraw), msg.sender);
+        emit ClosePosition(id, pnl, msg.sender);
     }
 
     /// @notice Returns whether an open position is liquidatable
