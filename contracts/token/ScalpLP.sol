@@ -43,9 +43,6 @@ contract ScalpLP is ERC4626 {
     // AddProceeds event
     event AddProceeds(uint256 proceeds);
 
-    // SubtractLoss event
-    event SubtractLoss(uint256 loss);
-
     /*==== CONSTRUCTOR ====*/
     /**
      * @param _scalp The address of the scalp contract creating the lp token
@@ -171,14 +168,6 @@ contract ScalpLP is ERC4626 {
         _totalAssets += proceeds;
 
         emit AddProceeds(proceeds);
-    }
-
-    // Subtract loss from total available assets
-    function subtractLoss(uint loss) public {
-        require(msg.sender == address(scalp), "Only scalp can call this function");
-        _totalAssets -= loss;
-
-        emit SubtractLoss(loss);
     }
 
     function beforeWithdraw(uint256 assets, uint256 /*shares*/ ) internal virtual override {
