@@ -512,7 +512,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
             int256(scalpPositions[id].margin) + calcPnl(id) <=
             int256(
                 minimumAbsoluteLiquidationThreshold *
-                    (scalpPositions[id].positions / (10 ** quoteDecimals))
+                    (scalpPositions[id].size / (10 ** quoteDecimals))
             );
     }
 
@@ -526,19 +526,19 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         int256 threshold = int256(scalpPositions[id].margin) -
             int256(
                 (minimumAbsoluteLiquidationThreshold *
-                    scalpPositions[id].positions) / (10 ** quoteDecimals)
+                    scalpPositions[id].size) / (10 ** quoteDecimals)
             );
 
         if (scalpPositions[id].isShort) {
             price =
                 scalpPositions[id].entry +
                 (((10 ** quoteDecimals) * uint(threshold)) /
-                    scalpPositions[id].positions); // (quoteDecimals)
+                    scalpPositions[id].size); // (quoteDecimals)
         } else {
             price =
                 scalpPositions[id].entry -
                 (((10 ** quoteDecimals) * uint(threshold)) /
-                    scalpPositions[id].positions); // (quoteDecimals)
+                    scalpPositions[id].size); // (quoteDecimals)
         }
     }
 

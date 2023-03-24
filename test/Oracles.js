@@ -83,7 +83,7 @@ describe("Option scalp", function() {
           "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
           "10000000", // $10
           "5000000", // 0.05%
-          "5000000",  // $5
+          "4000",  // $0.004
           "60" // 1 minutes
       ]
     );
@@ -222,7 +222,7 @@ describe("Option scalp", function() {
           "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
           "5000000000000000", // 0.005
           "5000000", // 0.05%
-          "2500000000000000",  // 0.0025
+          "25000000000000",  // 0.000025
           "60" // 1 minute
       ]
     );
