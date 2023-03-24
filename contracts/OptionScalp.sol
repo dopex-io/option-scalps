@@ -153,6 +153,12 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     // Close position event
     event ClosePosition(uint256 id, int256 pnl, address indexed user);
 
+    // Shortfall
+    event Shortfall(bool isQuote, uint256 amount);
+
+    // AddProceeds event
+    event AddProceeds(bool isQuote, uint256 amount);
+
     // Emergency withdraw
     event EmergencyWithdraw(address indexed receiver);
 
@@ -382,9 +388,11 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
             );
 
             baseLp.addProceeds(basePremium);
+            emit AddProceeds(false, basePremium);
         } else {
             quoteLp.deposit(openingFees, insuranceFund);
             quoteLp.addProceeds(premium);
+            emit AddProceeds(true, premium);
         }
 
         // Generate scalp position NFT
@@ -458,6 +466,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
                 );
             } else {
                 baseLp.unlockLiquidity(swapped);
+                emit Shortfall(false, scalpPositions[id].amountBorrowed - swapped);
             }
         } else {
             // base to quote
@@ -484,6 +493,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
                 );
             } else {
                 quoteLp.unlockLiquidity(scalpPositions[id].margin + swapped);
+                emit Shortfall(true, scalpPositions[id].amountBorrowed - scalpPositions[id].margin + swapped);
             }
         }
 
