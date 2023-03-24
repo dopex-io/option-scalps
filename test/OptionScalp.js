@@ -66,7 +66,7 @@ describe("Option scalp", function () {
           "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
           "10000000", // $10
           "5000000", // 0.05%
-          "5000000",  // $5
+          "4000",  // $0.004
           "1" // 1 second
       ]
     );
@@ -735,7 +735,7 @@ describe("Option scalp", function () {
     // price pumps from 1259.68 to 1241.68 = -$18
     // size was $5000 so positions is 5000 / 1259.68 = 3.96, expected profit is 3.96 * -18 = -$71.28
 
-    expect((await optionScalp.getLiquidationPrice(8))).to.eq("1243342994");
+    expect((await optionScalp.getLiquidationPrice(8))).to.eq("1261027749");
 
     await priceOracle.updateUnderlyingPrice("124168720400");
 
@@ -802,7 +802,7 @@ describe("Option scalp", function () {
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(false, "1000000000", 0, "150000000", "124282270632");
 
-    expect(await optionScalp.getLiquidationPrice(9)).to.eq("1061399070");
+    expect(await optionScalp.getLiquidationPrice(9)).to.eq("1242676706");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
 
@@ -880,7 +880,7 @@ describe("Option scalp", function () {
              "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
              "10000000", // $10
              "5000000", // 0.05%
-             "5000000",  // $5
+             "4000",  // $0.004
              "60" // 1 minute
       ]);
       await expect(optionScalp.connect(user1).openPosition(true, "1500000000", 0, "150000000", "0")).to.be.revertedWith("OI is too high");
@@ -888,7 +888,7 @@ describe("Option scalp", function () {
 
   it("user 1 can open position with leverage 1x", async function() {
        await optionScalp.connect(user1).openPosition(true, "150000000", 0, "150000000", "0");
-       expect((await optionScalp.getLiquidationPrice(10))).to.eq(2477083906);
+       expect((await optionScalp.getLiquidationPrice(10))).to.eq(1242036106);
   });
 
   it("get positions of user 1", async function() {
