@@ -57,7 +57,6 @@ describe("Option scalp", function () {
       18,
       6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
-      "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
       [
           "100000000000",  // $100.000
           "10000000000000",  // $10M
