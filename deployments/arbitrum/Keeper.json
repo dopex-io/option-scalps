@@ -1,0 +1,278 @@
+{
+  "address": "0xB39273bD231087B47887f154ebE2f0Db2f3e9B34",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "_keeper",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "_setAs",
+          "type": "bool"
+        }
+      ],
+      "name": "WhitelistedKeeperSetAs",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "_positionIds",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "address",
+          "name": "_scalpContract",
+          "type": "address"
+        }
+      ],
+      "name": "closePositions",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_startIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_endIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_scalpContract",
+          "type": "address"
+        }
+      ],
+      "name": "getCloseablePositions",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "_closeablePositions",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_positionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_optionScalpContract",
+          "type": "address"
+        }
+      ],
+      "name": "isPositionClosable",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "_isCloseable",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_keeper",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "_setAs",
+          "type": "bool"
+        }
+      ],
+      "name": "setWhitelistedKeeper",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "whitelistedKeepers",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x83c92994c518f2ac4da5e12080866a3af4b924f597df7dc06a64d3a9f4f18dd0",
+  "receipt": {
+    "to": null,
+    "from": "0xA20ff37236bce815b8e0e4e0B7bB90A5A97b19F4",
+    "contractAddress": "0xB39273bD231087B47887f154ebE2f0Db2f3e9B34",
+    "transactionIndex": 2,
+    "gasUsed": "3563963",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xd570d8b3944c749af4dc2f81e70cc1f084e8ebd94c4fa7d746bdaca29b297f64",
+    "transactionHash": "0x83c92994c518f2ac4da5e12080866a3af4b924f597df7dc06a64d3a9f4f18dd0",
+    "logs": [],
+    "blockNumber": 73374475,
+    "cumulativeGasUsed": "4151796",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [],
+  "numDeployments": 1,
+  "solcInputHash": "c4951eefff02f2bb7c078934889a32d3",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.9+commit.e5eed63a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"_keeper\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"_setAs\",\"type\":\"bool\"}],\"name\":\"WhitelistedKeeperSetAs\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"_positionIds\",\"type\":\"uint256[]\"},{\"internalType\":\"address\",\"name\":\"_scalpContract\",\"type\":\"address\"}],\"name\":\"closePositions\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_startIndex\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_endIndex\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_scalpContract\",\"type\":\"address\"}],\"name\":\"getCloseablePositions\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"_closeablePositions\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_positionId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_optionScalpContract\",\"type\":\"address\"}],\"name\":\"isPositionClosable\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"_isCloseable\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_keeper\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"_setAs\",\"type\":\"bool\"}],\"name\":\"setWhitelistedKeeper\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"whitelistedKeepers\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"closePositions(uint256[],address)\":{\"params\":{\"_positionIds\":\"Array of the position ids.\",\"_scalpContract\":\"Address of the option scalp contract.\"}},\"getCloseablePositions(uint256,uint256,address)\":{\"params\":{\"_endIndex\":\"Ending index of position ids.\",\"_scalpContract\":\"Address of the option scalp contract.\",\"_startIndex\":\"Start index of position ids.\"},\"returns\":{\"_closeablePositions\":\" positions that can closed.\"}},\"isPositionClosable(uint256,address)\":{\"params\":{\"_optionScalpContract\":\"Address of the option scalp contract.\",\"_positionId\":\"ID of the scalp position.\"},\"returns\":{\"_isCloseable\":\"Whether the position can be closed or not.\"}},\"setWhitelistedKeeper(address,bool)\":{\"details\":\"Only callable by owner/deployer.\",\"params\":{\"_keeper\":\"Address of the keeper.\",\"_setAs\":\"True to whitelist, false to de-whitelist.\"}}},\"stateVariables\":{\"whitelistedKeepers\":{\"details\":\"address of the keeper => whitelisted or not\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"closePositions(uint256[],address)\":{\"notice\":\"Closes scalp positions of a given position ids.\"},\"getCloseablePositions(uint256,uint256,address)\":{\"notice\":\"Query for positions that can be closed. Conditions required are         where the position is within exercise time frame or is liquidatable.\"},\"isPositionClosable(uint256,address)\":{\"notice\":\"Check if a position is close able or not.\"},\"owner()\":{\"notice\":\"Owner/deployer of keeper contract\"},\"setWhitelistedKeeper(address,bool)\":{\"notice\":\"Set a keeper as whitelisted or not.\"},\"whitelistedKeepers(address)\":{\"notice\":\"Mapping to store whitelisted keepers who can call closePositions()\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/Keeper/Keeper.sol\":\"Keeper\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":5000},\"remappings\":[]},\"sources\":{\"contracts/Keeper/Keeper.sol\":{\"content\":\"// SPDX-License-Identifier: UNLICENSED\\npragma solidity ^0.8.9;\\n\\nimport {IOptionScalp} from \\\"../interface/IOptionScalp.sol\\\";\\n\\ncontract Keeper {\\n    /// @notice Owner/deployer of keeper contract\\n    address public owner;\\n\\n    /// @notice Mapping to store whitelisted keepers who can call closePositions()\\n    /// @dev address of the keeper => whitelisted or not\\n    mapping(address => bool) public whitelistedKeepers;\\n\\n    event WhitelistedKeeperSetAs(address _keeper, bool _setAs);\\n\\n    constructor() {\\n        owner = msg.sender;\\n        whitelistedKeepers[msg.sender] = true;\\n    }\\n\\n    /**\\n     * @notice Query for positions that can be closed. Conditions required are\\n     *         where the position is within exercise time frame or is liquidatable.\\n     * @param  _startIndex          Start index of position ids.\\n     * @param  _endIndex            Ending index of position ids.\\n     * @param  _scalpContract       Address of the option scalp contract.\\n     * @return _closeablePositions  positions that can closed.\\n     */\\n    function getCloseablePositions(\\n        uint256 _startIndex,\\n        uint256 _endIndex,\\n        address _scalpContract\\n    ) external view returns (uint256[] memory _closeablePositions) {\\n        IOptionScalp scalpContract = IOptionScalp(_scalpContract);\\n        IOptionScalp.ScalpPosition memory scalpPosition;\\n\\n        _closeablePositions = new uint256[](_endIndex - _startIndex);\\n\\n        do {\\n            scalpPosition = scalpContract.scalpPositions(_startIndex);\\n\\n            if (isPositionClosable(_startIndex, _scalpContract)) {\\n                _closeablePositions[_startIndex] = _startIndex;\\n            }\\n            unchecked {\\n                ++_startIndex;\\n            }\\n        } while (_startIndex <= _endIndex);\\n    }\\n\\n    /**\\n     * @notice Closes scalp positions of a given position ids.\\n     * @param _positionIds   Array of the position ids.\\n     * @param _scalpContract Address of the option scalp contract.\\n     */\\n    function closePositions(\\n        uint256[] memory _positionIds,\\n        address _scalpContract\\n    ) external {\\n        require(\\n            whitelistedKeepers[msg.sender],\\n            \\\"KEEPER: CALLER NOT WHITELSITED\\\"\\n        );\\n        uint256 startIndex;\\n        do {\\n            IOptionScalp(_scalpContract).closePosition(\\n                _positionIds[startIndex]\\n            );\\n\\n            unchecked {\\n                ++startIndex;\\n            }\\n        } while (startIndex < _positionIds.length);\\n    }\\n\\n    /**\\n     * @notice Set a keeper as whitelisted or not.\\n     * @dev Only callable by owner/deployer.\\n     * @param _keeper Address of the keeper.\\n     * @param _setAs  True to whitelist, false to de-whitelist.\\n     */\\n    function setWhitelistedKeeper(address _keeper, bool _setAs) external {\\n        require(msg.sender == owner, \\\"KEEPER: NOT OWNER\\\");\\n        whitelistedKeepers[_keeper] = _setAs;\\n        emit WhitelistedKeeperSetAs(_keeper, _setAs);\\n    }\\n\\n    /**\\n    * @notice Check if a position is close able or not.\\n    * @param _positionId           ID of the scalp position.\\n    * @param _optionScalpContract Address of the option scalp contract.\\n    * @return _isCloseable Whether the position can be closed or not.\\n     */\\n    function isPositionClosable(\\n        uint256 _positionId,\\n        address _optionScalpContract\\n    ) public view returns (bool _isCloseable) {\\n        IOptionScalp scalpContract = IOptionScalp(_optionScalpContract);\\n        IOptionScalp.ScalpPosition memory scalpPosition = IOptionScalp(\\n            _optionScalpContract\\n        ).scalpPositions(_positionId);\\n\\n        if (scalpPosition.isOpen) {\\n            // Check if position is liquidatable\\n            bool isLiquidatable = scalpContract.isLiquidatable(_positionId);\\n\\n            // // Check if within expiry window\\n            bool isWithinExpiryWindow = block.timestamp >=\\n                scalpPosition.openedAt + scalpPosition.timeframe;\\n\\n            if (isLiquidatable || isWithinExpiryWindow) {\\n                return true;\\n            }\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0x0df55fd95c7cd5152b0f67e8d9630d05a583fa8fd91d9f98879b0186f53d19e1\",\"license\":\"UNLICENSED\"},\"contracts/interface/IOptionScalp.sol\":{\"content\":\"interface IOptionScalp {\\n    function scalpPositions(\\n        uint256\\n    ) external view returns (ScalpPosition memory);\\n\\n    function isLiquidatable(uint256 id) external view returns (bool);\\n\\n    function closePosition(uint256 id) external;\\n\\n    struct ScalpPosition {\\n        // Is position open\\n        bool isOpen;\\n        // Is short\\n        bool isShort;\\n        // Total size in quote asset\\n        uint256 size;\\n        // Open position count (in base asset)\\n        uint256 positions;\\n        // Amount borrowed\\n        uint256 amountBorrowed;\\n        // Amount received from swap\\n        uint256 amountOut;\\n        // Entry price\\n        uint256 entry;\\n        // Margin provided\\n        uint256 margin;\\n        // Premium for position\\n        uint256 premium;\\n        // Fees for position\\n        uint256 fees;\\n        // Final PNL of position\\n        int256 pnl;\\n        // Opened at timestamp\\n        uint256 openedAt;\\n        // How long position is to be kept open\\n        uint256 timeframe;\\n    }\\n}\\n\",\"keccak256\":\"0x6da5d5471e3ba1f86912d7099b6cc6a25eef9625b59c923e0a34c82d92fa9549\"}},\"version\":1}",
+  "bytecode": "0x608060405234801561001057600080fd5b50600080546001600160a01b0319163390811782558152600160208190526040909120805460ff19169091179055610afb8061004d6000396000f3fe608060405234801561001057600080fd5b50600436106100725760003560e01c80638da5cb5b116100505780638da5cb5b146100c85780639f1c5a8e1461010d578063edbe94371461013057600080fd5b80632742d644146100775780635edfd9081461008c5780638d86a79d146100b5575b600080fd5b61008a610085366004610790565b610153565b005b61009f61009a366004610848565b61026d565b6040516100ac919061087d565b60405180910390f35b61008a6100c33660046108d2565b610419565b6000546100e89073ffffffffffffffffffffffffffffffffffffffff1681565b60405173ffffffffffffffffffffffffffffffffffffffff90911681526020016100ac565b61012061011b366004610909565b610528565b60405190151581526020016100ac565b61012061013e366004610935565b60016020526000908152604090205460ff1681565b3360009081526001602052604090205460ff166101d1576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601e60248201527f4b45455045523a2043414c4c4552204e4f542057484954454c5349544544000060448201526064015b60405180910390fd5b60005b8173ffffffffffffffffffffffffffffffffffffffff1663a126d60184838151811061020257610202610957565b60200260200101516040518263ffffffff1660e01b815260040161022891815260200190565b600060405180830381600087803b15801561024257600080fd5b505af1158015610256573d6000803e3d6000fd5b50505050806001019050825181106101d457505050565b606060008290506102e3604051806101a0016040528060001515815260200160001515815260200160008152602001600081526020016000815260200160008152602001600081526020016000815260200160008152602001600081526020016000815260200160008152602001600081525090565b6102ed86866109b5565b67ffffffffffffffff811115610305576103056106bf565b60405190808252806020026020018201604052801561032e578160200160208202803683370190505b5092505b6040517f0f0189ce0000000000000000000000000000000000000000000000000000000081526004810187905273ffffffffffffffffffffffffffffffffffffffff831690630f0189ce906024016101a06040518083038186803b15801561039957600080fd5b505afa1580156103ad573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906103d191906109d7565b90506103dd8685610528565b1561040257858387815181106103f5576103f5610957565b6020026020010181815250505b856001019550848611156103325750509392505050565b60005473ffffffffffffffffffffffffffffffffffffffff16331461049a576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601160248201527f4b45455045523a204e4f54204f574e455200000000000000000000000000000060448201526064016101c8565b73ffffffffffffffffffffffffffffffffffffffff821660008181526001602090815260409182902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00168515159081179091558251938452908301527f782164bd2dcc56adba217a7a298145ad8c5b4040cde1f25b371df954993d013e910160405180910390a15050565b6040517f0f0189ce000000000000000000000000000000000000000000000000000000008152600481018390526000908290829073ffffffffffffffffffffffffffffffffffffffff831690630f0189ce906024016101a06040518083038186803b15801561059657600080fd5b505afa1580156105aa573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906105ce91906109d7565b8051909150156106b6576040517f211a44430000000000000000000000000000000000000000000000000000000081526004810186905260009073ffffffffffffffffffffffffffffffffffffffff84169063211a44439060240160206040518083038186803b15801561064157600080fd5b505afa158015610655573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906106799190610a90565b905060008261018001518361016001516106939190610aad565b421015905081806106a15750805b156106b35760019450505050506106b9565b50505b50505b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040516101a0810167ffffffffffffffff81118282101715610712576107126106bf565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff8111828210171561075f5761075f6106bf565b604052919050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461078b57600080fd5b919050565b600080604083850312156107a357600080fd5b823567ffffffffffffffff808211156107bb57600080fd5b818501915085601f8301126107cf57600080fd5b81356020828211156107e3576107e36106bf565b8160051b92506107f4818401610718565b828152928401810192818101908985111561080e57600080fd5b948201945b8486101561082c57853582529482019490820190610813565b965061083b9050878201610767565b9450505050509250929050565b60008060006060848603121561085d57600080fd5b833592506020840135915061087460408501610767565b90509250925092565b6020808252825182820181905260009190848201906040850190845b818110156108b557835183529284019291840191600101610899565b50909695505050505050565b80151581146108cf57600080fd5b50565b600080604083850312156108e557600080fd5b6108ee83610767565b915060208301356108fe816108c1565b809150509250929050565b6000806040838503121561091c57600080fd5b8235915061092c60208401610767565b90509250929050565b60006020828403121561094757600080fd5b61095082610767565b9392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000828210156109c7576109c7610986565b500390565b805161078b816108c1565b60006101a082840312156109ea57600080fd5b6109f26106ee565b6109fb836109cc565b8152610a09602084016109cc565b602082015260408301516040820152606083015160608201526080830151608082015260a083015160a082015260c083015160c082015260e083015160e08201526101008084015181830152506101208084015181830152506101408084015181830152506101608084015181830152506101808084015181830152508091505092915050565b600060208284031215610aa257600080fd5b8151610950816108c1565b60008219821115610ac057610ac0610986565b50019056fea264697066735822122065fb624e6109b4b2e0c9c6e7012055bf638ff044cc98f02954a6f9b18673edd864736f6c63430008090033",
+  "deployedBytecode": "0x608060405234801561001057600080fd5b50600436106100725760003560e01c80638da5cb5b116100505780638da5cb5b146100c85780639f1c5a8e1461010d578063edbe94371461013057600080fd5b80632742d644146100775780635edfd9081461008c5780638d86a79d146100b5575b600080fd5b61008a610085366004610790565b610153565b005b61009f61009a366004610848565b61026d565b6040516100ac919061087d565b60405180910390f35b61008a6100c33660046108d2565b610419565b6000546100e89073ffffffffffffffffffffffffffffffffffffffff1681565b60405173ffffffffffffffffffffffffffffffffffffffff90911681526020016100ac565b61012061011b366004610909565b610528565b60405190151581526020016100ac565b61012061013e366004610935565b60016020526000908152604090205460ff1681565b3360009081526001602052604090205460ff166101d1576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601e60248201527f4b45455045523a2043414c4c4552204e4f542057484954454c5349544544000060448201526064015b60405180910390fd5b60005b8173ffffffffffffffffffffffffffffffffffffffff1663a126d60184838151811061020257610202610957565b60200260200101516040518263ffffffff1660e01b815260040161022891815260200190565b600060405180830381600087803b15801561024257600080fd5b505af1158015610256573d6000803e3d6000fd5b50505050806001019050825181106101d457505050565b606060008290506102e3604051806101a0016040528060001515815260200160001515815260200160008152602001600081526020016000815260200160008152602001600081526020016000815260200160008152602001600081526020016000815260200160008152602001600081525090565b6102ed86866109b5565b67ffffffffffffffff811115610305576103056106bf565b60405190808252806020026020018201604052801561032e578160200160208202803683370190505b5092505b6040517f0f0189ce0000000000000000000000000000000000000000000000000000000081526004810187905273ffffffffffffffffffffffffffffffffffffffff831690630f0189ce906024016101a06040518083038186803b15801561039957600080fd5b505afa1580156103ad573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906103d191906109d7565b90506103dd8685610528565b1561040257858387815181106103f5576103f5610957565b6020026020010181815250505b856001019550848611156103325750509392505050565b60005473ffffffffffffffffffffffffffffffffffffffff16331461049a576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601160248201527f4b45455045523a204e4f54204f574e455200000000000000000000000000000060448201526064016101c8565b73ffffffffffffffffffffffffffffffffffffffff821660008181526001602090815260409182902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00168515159081179091558251938452908301527f782164bd2dcc56adba217a7a298145ad8c5b4040cde1f25b371df954993d013e910160405180910390a15050565b6040517f0f0189ce000000000000000000000000000000000000000000000000000000008152600481018390526000908290829073ffffffffffffffffffffffffffffffffffffffff831690630f0189ce906024016101a06040518083038186803b15801561059657600080fd5b505afa1580156105aa573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906105ce91906109d7565b8051909150156106b6576040517f211a44430000000000000000000000000000000000000000000000000000000081526004810186905260009073ffffffffffffffffffffffffffffffffffffffff84169063211a44439060240160206040518083038186803b15801561064157600080fd5b505afa158015610655573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906106799190610a90565b905060008261018001518361016001516106939190610aad565b421015905081806106a15750805b156106b35760019450505050506106b9565b50505b50505b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040516101a0810167ffffffffffffffff81118282101715610712576107126106bf565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff8111828210171561075f5761075f6106bf565b604052919050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461078b57600080fd5b919050565b600080604083850312156107a357600080fd5b823567ffffffffffffffff808211156107bb57600080fd5b818501915085601f8301126107cf57600080fd5b81356020828211156107e3576107e36106bf565b8160051b92506107f4818401610718565b828152928401810192818101908985111561080e57600080fd5b948201945b8486101561082c57853582529482019490820190610813565b965061083b9050878201610767565b9450505050509250929050565b60008060006060848603121561085d57600080fd5b833592506020840135915061087460408501610767565b90509250925092565b6020808252825182820181905260009190848201906040850190845b818110156108b557835183529284019291840191600101610899565b50909695505050505050565b80151581146108cf57600080fd5b50565b600080604083850312156108e557600080fd5b6108ee83610767565b915060208301356108fe816108c1565b809150509250929050565b6000806040838503121561091c57600080fd5b8235915061092c60208401610767565b90509250929050565b60006020828403121561094757600080fd5b61095082610767565b9392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000828210156109c7576109c7610986565b500390565b805161078b816108c1565b60006101a082840312156109ea57600080fd5b6109f26106ee565b6109fb836109cc565b8152610a09602084016109cc565b602082015260408301516040820152606083015160608201526080830151608082015260a083015160a082015260c083015160c082015260e083015160e08201526101008084015181830152506101208084015181830152506101408084015181830152506101608084015181830152506101808084015181830152508091505092915050565b600060208284031215610aa257600080fd5b8151610950816108c1565b60008219821115610ac057610ac0610986565b50019056fea264697066735822122065fb624e6109b4b2e0c9c6e7012055bf638ff044cc98f02954a6f9b18673edd864736f6c63430008090033",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {
+      "closePositions(uint256[],address)": {
+        "params": {
+          "_positionIds": "Array of the position ids.",
+          "_scalpContract": "Address of the option scalp contract."
+        }
+      },
+      "getCloseablePositions(uint256,uint256,address)": {
+        "params": {
+          "_endIndex": "Ending index of position ids.",
+          "_scalpContract": "Address of the option scalp contract.",
+          "_startIndex": "Start index of position ids."
+        },
+        "returns": {
+          "_closeablePositions": " positions that can closed."
+        }
+      },
+      "isPositionClosable(uint256,address)": {
+        "params": {
+          "_optionScalpContract": "Address of the option scalp contract.",
+          "_positionId": "ID of the scalp position."
+        },
+        "returns": {
+          "_isCloseable": "Whether the position can be closed or not."
+        }
+      },
+      "setWhitelistedKeeper(address,bool)": {
+        "details": "Only callable by owner/deployer.",
+        "params": {
+          "_keeper": "Address of the keeper.",
+          "_setAs": "True to whitelist, false to de-whitelist."
+        }
+      }
+    },
+    "stateVariables": {
+      "whitelistedKeepers": {
+        "details": "address of the keeper => whitelisted or not"
+      }
+    },
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "closePositions(uint256[],address)": {
+        "notice": "Closes scalp positions of a given position ids."
+      },
+      "getCloseablePositions(uint256,uint256,address)": {
+        "notice": "Query for positions that can be closed. Conditions required are         where the position is within exercise time frame or is liquidatable."
+      },
+      "isPositionClosable(uint256,address)": {
+        "notice": "Check if a position is close able or not."
+      },
+      "owner()": {
+        "notice": "Owner/deployer of keeper contract"
+      },
+      "setWhitelistedKeeper(address,bool)": {
+        "notice": "Set a keeper as whitelisted or not."
+      },
+      "whitelistedKeepers(address)": {
+        "notice": "Mapping to store whitelisted keepers who can call closePositions()"
+      }
+    },
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 6,
+        "contract": "contracts/Keeper/Keeper.sol:Keeper",
+        "label": "owner",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_address"
+      },
+      {
+        "astId": 11,
+        "contract": "contracts/Keeper/Keeper.sol:Keeper",
+        "label": "whitelistedKeepers",
+        "offset": 0,
+        "slot": "1",
+        "type": "t_mapping(t_address,t_bool)"
+      }
+    ],
+    "types": {
+      "t_address": {
+        "encoding": "inplace",
+        "label": "address",
+        "numberOfBytes": "20"
+      },
+      "t_bool": {
+        "encoding": "inplace",
+        "label": "bool",
+        "numberOfBytes": "1"
+      },
+      "t_mapping(t_address,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_address",
+        "label": "mapping(address => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      }
+    }
+  }
+}

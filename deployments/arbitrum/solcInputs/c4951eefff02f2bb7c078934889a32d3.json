@@ -1,0 +1,38 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/interface/IOptionScalp.sol": {
+      "content": "interface IOptionScalp {\n    function scalpPositions(\n        uint256\n    ) external view returns (ScalpPosition memory);\n\n    function isLiquidatable(uint256 id) external view returns (bool);\n\n    function closePosition(uint256 id) external;\n\n    struct ScalpPosition {\n        // Is position open\n        bool isOpen;\n        // Is short\n        bool isShort;\n        // Total size in quote asset\n        uint256 size;\n        // Open position count (in base asset)\n        uint256 positions;\n        // Amount borrowed\n        uint256 amountBorrowed;\n        // Amount received from swap\n        uint256 amountOut;\n        // Entry price\n        uint256 entry;\n        // Margin provided\n        uint256 margin;\n        // Premium for position\n        uint256 premium;\n        // Fees for position\n        uint256 fees;\n        // Final PNL of position\n        int256 pnl;\n        // Opened at timestamp\n        uint256 openedAt;\n        // How long position is to be kept open\n        uint256 timeframe;\n    }\n}\n"
+    },
+    "contracts/Keeper/Keeper.sol": {
+      "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity ^0.8.9;\n\nimport {IOptionScalp} from \"../interface/IOptionScalp.sol\";\n\ncontract Keeper {\n    /// @notice Owner/deployer of keeper contract\n    address public owner;\n\n    /// @notice Mapping to store whitelisted keepers who can call closePositions()\n    /// @dev address of the keeper => whitelisted or not\n    mapping(address => bool) public whitelistedKeepers;\n\n    event WhitelistedKeeperSetAs(address _keeper, bool _setAs);\n\n    constructor() {\n        owner = msg.sender;\n        whitelistedKeepers[msg.sender] = true;\n    }\n\n    /**\n     * @notice Query for positions that can be closed. Conditions required are\n     *         where the position is within exercise time frame or is liquidatable.\n     * @param  _startIndex          Start index of position ids.\n     * @param  _endIndex            Ending index of position ids.\n     * @param  _scalpContract       Address of the option scalp contract.\n     * @return _closeablePositions  positions that can closed.\n     */\n    function getCloseablePositions(\n        uint256 _startIndex,\n        uint256 _endIndex,\n        address _scalpContract\n    ) external view returns (uint256[] memory _closeablePositions) {\n        IOptionScalp scalpContract = IOptionScalp(_scalpContract);\n        IOptionScalp.ScalpPosition memory scalpPosition;\n\n        _closeablePositions = new uint256[](_endIndex - _startIndex);\n\n        do {\n            scalpPosition = scalpContract.scalpPositions(_startIndex);\n\n            if (isPositionClosable(_startIndex, _scalpContract)) {\n                _closeablePositions[_startIndex] = _startIndex;\n            }\n            unchecked {\n                ++_startIndex;\n            }\n        } while (_startIndex <= _endIndex);\n    }\n\n    /**\n     * @notice Closes scalp positions of a given position ids.\n     * @param _positionIds   Array of the position ids.\n     * @param _scalpContract Address of the option scalp contract.\n     */\n    function closePositions(\n        uint256[] memory _positionIds,\n        address _scalpContract\n    ) external {\n        require(\n            whitelistedKeepers[msg.sender],\n            \"KEEPER: CALLER NOT WHITELSITED\"\n        );\n        uint256 startIndex;\n        do {\n            IOptionScalp(_scalpContract).closePosition(\n                _positionIds[startIndex]\n            );\n\n            unchecked {\n                ++startIndex;\n            }\n        } while (startIndex < _positionIds.length);\n    }\n\n    /**\n     * @notice Set a keeper as whitelisted or not.\n     * @dev Only callable by owner/deployer.\n     * @param _keeper Address of the keeper.\n     * @param _setAs  True to whitelist, false to de-whitelist.\n     */\n    function setWhitelistedKeeper(address _keeper, bool _setAs) external {\n        require(msg.sender == owner, \"KEEPER: NOT OWNER\");\n        whitelistedKeepers[_keeper] = _setAs;\n        emit WhitelistedKeeperSetAs(_keeper, _setAs);\n    }\n\n    /**\n    * @notice Check if a position is close able or not.\n    * @param _positionId           ID of the scalp position.\n    * @param _optionScalpContract Address of the option scalp contract.\n    * @return _isCloseable Whether the position can be closed or not.\n     */\n    function isPositionClosable(\n        uint256 _positionId,\n        address _optionScalpContract\n    ) public view returns (bool _isCloseable) {\n        IOptionScalp scalpContract = IOptionScalp(_optionScalpContract);\n        IOptionScalp.ScalpPosition memory scalpPosition = IOptionScalp(\n            _optionScalpContract\n        ).scalpPositions(_positionId);\n\n        if (scalpPosition.isOpen) {\n            // Check if position is liquidatable\n            bool isLiquidatable = scalpContract.isLiquidatable(_positionId);\n\n            // // Check if within expiry window\n            bool isWithinExpiryWindow = block.timestamp >=\n                scalpPosition.openedAt + scalpPosition.timeframe;\n\n            if (isLiquidatable || isWithinExpiryWindow) {\n                return true;\n            }\n        }\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 5000
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
