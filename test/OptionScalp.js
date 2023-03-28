@@ -737,7 +737,7 @@ describe("Option scalp", function () {
 
     expect((await optionScalp.getLiquidationPrice(8))).to.eq("1191041749");
 
-    await priceOracle.updateUnderlyingPrice("119068720400");
+    await priceOracle.updateUnderlyingPrice("124168720400");
 
     await network.provider.send("evm_increaseTime", [10]);
 
@@ -900,7 +900,7 @@ describe("Option scalp", function () {
   it("pre emergency withdraw", async function() {
       const usdcScalpBalance = await usdc.balanceOf(optionScalp.address);
       const wethScalpBalance = await weth.balanceOf(optionScalp.address);
-      expect(usdcScalpBalance).to.eq("309138346");
+      expect(usdcScalpBalance).to.eq("309137748");
       expect(wethScalpBalance).to.eq("6933632223767943623");
 
       const owner = await optionScalp.owner();
@@ -923,7 +923,7 @@ describe("Option scalp", function () {
 
       const usdcOwnerBalance = await usdc.balanceOf(owner);
       const wethOwnerBalance = await weth.balanceOf(owner);
-      expect(usdcOwnerBalance).to.eq("309138346");
+      expect(usdcOwnerBalance).to.eq("309137748");
       expect(wethOwnerBalance).to.eq("6933632223767943623");
   });
 });
