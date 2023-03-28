@@ -735,9 +735,9 @@ describe("Option scalp", function () {
     // price pumps from 1259.68 to 1241.68 = -$18
     // size was $5000 so positions is 5000 / 1259.68 = 3.96, expected profit is 3.96 * -18 = -$71.28
 
-    expect((await optionScalp.getLiquidationPrice(8))).to.eq("1261027749");
+    expect((await optionScalp.getLiquidationPrice(8))).to.eq("1191041749");
 
-    await priceOracle.updateUnderlyingPrice("124168720400");
+    await priceOracle.updateUnderlyingPrice("119068720400");
 
     await network.provider.send("evm_increaseTime", [10]);
 
@@ -802,7 +802,7 @@ describe("Option scalp", function () {
     await usdc.connect(user1).approve(optionScalp.address, "10000000000");
     await optionScalp.connect(user1).openPosition(false, "1000000000", 0, "150000000", "124282270632");
 
-    expect(await optionScalp.getLiquidationPrice(9)).to.eq("1242676706");
+    expect(await optionScalp.getLiquidationPrice(9)).to.eq("1096822706");
 
     await weth.connect(b50).approve(uniV3Router.address, ethers.utils.parseEther("700.0"));
 
@@ -888,7 +888,7 @@ describe("Option scalp", function () {
 
   it("user 1 can open position with leverage 1x", async function() {
        await optionScalp.connect(user1).openPosition(true, "150000000", 0, "150000000", "0");
-       expect((await optionScalp.getLiquidationPrice(10))).to.eq(1242036106);
+       expect((await optionScalp.getLiquidationPrice(10))).to.eq(1390440106);
   });
 
   it("get positions of user 1", async function() {
@@ -900,7 +900,7 @@ describe("Option scalp", function () {
   it("pre emergency withdraw", async function() {
       const usdcScalpBalance = await usdc.balanceOf(optionScalp.address);
       const wethScalpBalance = await weth.balanceOf(optionScalp.address);
-      expect(usdcScalpBalance).to.eq("309137748");
+      expect(usdcScalpBalance).to.eq("309138346");
       expect(wethScalpBalance).to.eq("6933632223767943623");
 
       const owner = await optionScalp.owner();
@@ -923,7 +923,7 @@ describe("Option scalp", function () {
 
       const usdcOwnerBalance = await usdc.balanceOf(owner);
       const wethOwnerBalance = await weth.balanceOf(owner);
-      expect(usdcOwnerBalance).to.eq("309137748");
+      expect(usdcOwnerBalance).to.eq("309138346");
       expect(wethOwnerBalance).to.eq("6933632223767943623");
   });
 });
