@@ -139,6 +139,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         uint256 openedAt;
         // How long position is to be kept open
         uint256 timeframe;
+        // Oracle prices
+        uint256[2] oraclePrices;
     }
 
     // Deposit event
@@ -410,7 +412,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
             fees: openingFees,
             pnl: 0,
             openedAt: block.timestamp,
-            timeframe: timeframes[timeframeIndex]
+            timeframe: timeframes[timeframeIndex],
+            oraclePrices: [markPrice, 0]
         });
 
         emit OpenPosition(id, size, msg.sender);
@@ -440,6 +443,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         uint256 traderWithdraw;
 
         scalpPositions[id].isOpen = false;
+        scalpPositions[id].oraclePrices = [scalpPositions[id].oraclePrices[0], getMarkPrice()];
         scalpPositionMinter.burn(id);
 
         if (scalpPositions[id].isShort) {
