@@ -18,6 +18,8 @@ import {Pausable} from "./helpers/Pausable.sol";
 contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     using SafeERC20 for IERC20;
 
+    uint256 MAX = 2**256 - 1;
+
     mapping (address => bool) optionScalps;
 
     mapping (uint => Order) public orders;
@@ -33,7 +35,7 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       bool cancelled;
       uint256 size;
       uint256 timeframeIndex;
-      uint256 margin;
+      uint256 collateral;
       uint256 entryLimit;
     }
 
@@ -41,13 +43,12 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
     event CancelOrder(uint id, address user);
 
-
-
     constructor(address[] memory _optionScalps) {
       for (uint i = 0; i < _optionScalps.length; i++) {
         require(_optionScalps[i] != address(0), "Invalid option scalp address");
         optionScalps[_optionScalps[i]] = true;
-        // TODO: Max approve base and quote tokens
+        IERC20(OptionScalp(_optionScalps[i]).quote()).safeApprove(_optionScalps[i], MAX);
+        IERC20(OptionScalp(_optionScalps[i]).base()).safeApprove(_optionScalps[i], MAX);
       }
     }
 
@@ -56,7 +57,7 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       bool isShort,
       uint256 size,
       uint256 timeframeIndex,
-      uint256 margin,
+      uint256 collateral, // margin + fees + premium
       uint256 entryLimit
     )
     external 
@@ -65,7 +66,7 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       OptionScalp optionScalp = OptionScalp(_optionScalp);
 
       require(optionScalp.timeframes(timeframeIndex) != 0, "Invalid timeframe");
-      require(margin >= optionScalp.minimumMargin(), "Insufficient margin");
+      require(collateral >= optionScalp.minimumMargin(), "Insufficient margin");
       require(size <= optionScalp.maxSize(), "Position exposure is too high");
 
       orders[orderCount] = Order({
@@ -77,16 +78,9 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         cancelled: false,
         size: size,
         timeframeIndex: timeframeIndex,
-        margin: margin, // Would use margin - premium - fees
+        collateral: collateral,
         entryLimit: entryLimit
       });
-
-      // We transfer margin from user
-      (optionScalp.quote()).safeTransferFrom(
-          msg.sender,
-          address(this),
-          margin
-      );
 
       id = orderCount++;
 
@@ -119,6 +113,12 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         );
       }
 
+      (optionScalp.quote()).safeTransferFrom(
+          orders[_id].user,
+          address(this),
+          orders[_id].collateral
+      );
+
       // Calculate premium for ATM option in quote
       uint256 premium = optionScalp.calcPremium(
           markPrice,
@@ -129,14 +129,13 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       // Calculate opening fees in quote
       uint256 openingFees = optionScalp.calcFees(orders[_id].size);
 
-      // TODO: Ensure margin >min. margin when creating limit orders
-      require(orders[_id].margin > premium + openingFees, "Insufficient margin");
+      require(orders[_id].collateral > premium + openingFees, "Insufficient margin");
 
       optionScalp.openPosition(
         orders[_id].isShort,
         orders[_id].size,
         orders[_id].timeframeIndex,
-        orders[_id].margin - premium - openingFees,
+        orders[_id].collateral - premium - openingFees,
         orders[_id].entryLimit
       );
     }
@@ -153,14 +152,6 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
       OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
 
-      // We transfer margin from user
-      (optionScalp.quote()).safeTransferFrom(
-          address(this),
-          msg.sender,
-          orders[_id].margin
-      );
-
       emit CancelOrder(_id, msg.sender);
     }
-
 }
