@@ -8,6 +8,7 @@ import {ContractWhitelist} from "./helpers/ContractWhitelist.sol";
 import {ScalpLP} from "./token/ScalpLP.sol";
 
 import {OptionScalp} from "./OptionScalp.sol";
+import {ScalpPositionMinter} from "./positions/ScalpPositionMinter.sol";
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -135,13 +136,15 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
       require(orders[_id].collateral > premium + openingFees, "Insufficient margin");
 
-      optionScalp.openPosition(
+      (uint256 id,) = optionScalp.openPosition(
         orders[_id].isShort,
         orders[_id].size,
         orders[_id].timeframeIndex,
         orders[_id].collateral - premium - openingFees,
         orders[_id].entryLimit
       );
+
+      ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
     }
     
     function cancelOrder(uint _id)
