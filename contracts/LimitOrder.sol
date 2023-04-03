@@ -37,6 +37,7 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       uint256 timeframeIndex;
       uint256 collateral;
       uint256 entryLimit;
+      uint256 expiry;
     }
 
     event NewOrder(uint id, address user);
@@ -58,7 +59,8 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       uint256 size,
       uint256 timeframeIndex,
       uint256 collateral, // margin + fees + premium
-      uint256 entryLimit
+      uint256 entryLimit,
+      uint256 expiry
     )
     external 
     returns (uint id) {
@@ -79,7 +81,8 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         size: size,
         timeframeIndex: timeframeIndex,
         collateral: collateral,
-        entryLimit: entryLimit
+        entryLimit: entryLimit,
+        expiry: expiry
       });
 
       id = orderCount++;
@@ -94,7 +97,8 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     external {
       require(
         !orders[_id].filled && 
-        !orders[_id].cancelled, 
+        !orders[_id].cancelled &&
+        block.timestamp <= orders[_id].expiry,
         "Order is not active and unfilled"
       );
       OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
