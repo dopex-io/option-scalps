@@ -428,8 +428,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         );
 
         address owner = IERC721(scalpPositionMinter).ownerOf(id);
+        bool liquidated = isLiquidatable(id);
 
-        if (!isLiquidatable(id) && msg.sender != owner)
+        if (!liquidated && msg.sender != owner)
             require(
                 block.timestamp >=
                     scalpPositions[id].openedAt + scalpPositions[id].timeframe,
@@ -461,9 +462,11 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
                 );
 
                 quote.safeTransfer(
-                    isLiquidatable(id) ? insuranceFund : owner,
+                    liquidated ? insuranceFund : owner,
                     traderWithdraw
                 );
+
+                if (liquidated) traderWithdraw = 0;
             } else {
                 baseLp.unlockLiquidity(swapped);
                 emit Shortfall(false, scalpPositions[id].amountBorrowed - swapped);
@@ -488,9 +491,11 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
                     scalpPositions[id].amountBorrowed;
 
                 quote.safeTransfer(
-                    isLiquidatable(id) ? insuranceFund : owner,
+                    liquidated ? insuranceFund : owner,
                     traderWithdraw
                 );
+
+                if (liquidated) traderWithdraw = 0;
             } else {
                 quoteLp.unlockLiquidity(scalpPositions[id].margin + swapped);
                 emit Shortfall(true, scalpPositions[id].amountBorrowed - scalpPositions[id].margin + swapped);
