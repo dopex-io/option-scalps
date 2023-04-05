@@ -144,7 +144,9 @@ describe("Limit orders", function () {
 
     expect(markPrice).to.eq(1000000000);
 
-    await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, "3000000000", "900000000", expiry);
+    const collateral = BigNumber.from('3000000000');
+
+    await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, collateral, "900000000", expiry);
 
     // User 2 tries to fill order
     await expect(limitOrders.connect(user2).fillOrder(0)).to.be.revertedWith('Mark price must be lower than limit entry price');
@@ -164,5 +166,10 @@ describe("Limit orders", function () {
 
     const owner = await erc721.ownerOf(1);
     expect(owner).to.eq(user1.address);
+
+    const endQuoteBalance = await usdc.balanceOf(user1.address);
+
+    const quoteOut = endQuoteBalance.sub(startQuoteBalance);
+    expect(quoteOut).to.eq(collateral * -1);
   });
 });
