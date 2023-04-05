@@ -12,11 +12,12 @@ import {ScalpPositionMinter} from "./positions/ScalpPositionMinter.sol";
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Pausable} from "./helpers/Pausable.sol";
 
-contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
+contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
 
     uint256 MAX = 2**256 - 1;
@@ -73,7 +74,7 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       require(size <= optionScalp.maxSize(), "Position exposure is too high");
 
       orders[orderCount] = Order({
-        id: orderCount++,
+        id: orderCount,
         optionScalp: _optionScalp,
         user: msg.sender,
         isShort: isShort,
@@ -86,12 +87,12 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         expiry: expiry
       });
 
-      id = orderCount++;
-
       emit NewOrder(
-        id,
+        orderCount,
         msg.sender
       );
+
+      orderCount++;
     }
 
     function fillOrder(uint _id)
