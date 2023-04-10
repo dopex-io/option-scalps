@@ -51,6 +51,9 @@ describe("Limit orders", function () {
     const OptionPricing = await ethers.getContractFactory("MockOptionPricing");
     optionPricing = await OptionPricing.deploy();
 
+    const LimitOrders = await ethers.getContractFactory("LimitOrder");
+    limitOrders = await LimitOrders.deploy([]);
+
     // Option scalp
     const OptionScalp = await ethers.getContractFactory("OptionScalp");
     optionScalp = await OptionScalp.deploy(
@@ -59,6 +62,7 @@ describe("Limit orders", function () {
       18,
       6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
+      limitOrders.address, // Limit orders manager
       [
           "100000000000",  // $100.000
           "10000000000000",  // $10M
@@ -73,8 +77,7 @@ describe("Limit orders", function () {
       ]
     );
 
-    const LimitOrders = await ethers.getContractFactory("LimitOrder");
-    limitOrders = await LimitOrders.deploy([optionScalp.address]);
+    await limitOrders.addOptionScalps([optionScalp.address]);
 
     // Base LP
     baseLp = (await ethers.getContractFactory("ScalpLP")).attach(await optionScalp.baseLp());

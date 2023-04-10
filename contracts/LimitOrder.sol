@@ -40,13 +40,14 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       uint256 collateral;
       uint256 entryLimit;
       uint256 expiry;
+      uint256 lockedLiquidity;
     }
 
     event NewOrder(uint id, address user);
 
     event CancelOrder(uint id, address user);
 
-    constructor(address[] memory _optionScalps) {
+    function addOptionScalps(address[] memory _optionScalps) external {
       for (uint i = 0; i < _optionScalps.length; i++) {
         require(_optionScalps[i] != address(0), "Invalid option scalp address");
         optionScalps[_optionScalps[i]] = true;
@@ -64,7 +65,8 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       uint256 entryLimit,
       uint256 expiry
     )
-    external 
+    nonReentrant
+    external
     returns (uint id) {
       require(optionScalps[_optionScalp], "Invalid option scalp contract");
       OptionScalp optionScalp = OptionScalp(_optionScalp);
@@ -84,8 +86,19 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
         timeframeIndex: timeframeIndex,
         collateral: collateral,
         entryLimit: entryLimit,
-        expiry: expiry
+        expiry: expiry,
+        lockedLiquidity: isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size
       });
+
+      (optionScalp.quote()).safeTransferFrom(
+          msg.sender,
+          address(this),
+          collateral
+      );
+
+      (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(orders[orderCount].lockedLiquidity);
+
+      // TODO: create uniswap v3 orders
 
       emit NewOrder(
         orderCount,
@@ -96,6 +109,7 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
     }
 
     function fillOrder(uint _id)
+    nonReentrant
     external {
       require(
         !orders[_id].filled && 
@@ -119,12 +133,6 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
         );
       }
 
-      (optionScalp.quote()).safeTransferFrom(
-          orders[_id].user,
-          address(this),
-          orders[_id].collateral
-      );
-
       // Calculate premium for ATM option in quote
       uint256 premium = optionScalp.calcPremium(
           markPrice,
@@ -137,18 +145,14 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
 
       require(orders[_id].collateral > premium + openingFees, "Insufficient margin");
 
-      (uint256 id,) = optionScalp.openPosition(
-        orders[_id].isShort,
-        orders[_id].size,
-        orders[_id].timeframeIndex,
-        orders[_id].collateral - premium - openingFees,
-        orders[_id].entryLimit
-      );
+      (orders[_id].isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).unlockLiquidity(orders[_id].lockedLiquidity);
+      // TODO: remove liquidity from Uniswap v3 and create position
 
-      ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
+      // ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
     }
     
     function cancelOrder(uint _id)
+    nonReentrant
     external {
       require(
         !orders[_id].filled && 
@@ -159,6 +163,12 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       orders[_id].cancelled = true;
 
       OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
+
+      (optionScalp.quote()).safeTransferFrom(
+          address(this),
+          orders[_id].user,
+          orders[_id].collateral
+      );
 
       emit CancelOrder(_id, msg.sender);
     }

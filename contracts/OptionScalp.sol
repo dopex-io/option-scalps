@@ -168,6 +168,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         uint256 _baseDecimals,
         uint256 _quoteDecimals,
         address _uniswapV3Router,
+        address _limitOrdersManager,
         Configuration memory config
     ) {
         require(_base != address(0), "Invalid base token");
@@ -196,9 +197,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         base.approve(address(uniswapV3Router), type(uint256).max);
         quote.approve(address(uniswapV3Router), type(uint256).max);
 
-        quoteLp = new ScalpLP(address(this), address(quote), quote.symbol());
+        quoteLp = new ScalpLP(address(this), _limitOrdersManager, address(quote), quote.symbol());
 
-        baseLp = new ScalpLP(address(this), address(base), base.symbol());
+        baseLp = new ScalpLP(address(this), _limitOrdersManager, address(base), base.symbol());
 
         quote.approve(address(quoteLp), type(uint256).max);
         base.approve(address(baseLp), type(uint256).max);
