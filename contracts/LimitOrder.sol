@@ -2,6 +2,9 @@
 pragma solidity ^0.8.9;
 
 import {IERC20} from "./interface/IERC20.sol";
+import {INonfungiblePositionManager} from "./interface/INonfungiblePositionManager.sol";
+import {IUniswapV3Factory} from "./interface/IUniswapV3Factory.sol";
+import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
 import {ContractWhitelist} from "./helpers/ContractWhitelist.sol";
 
@@ -25,6 +28,10 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
     mapping (address => bool) optionScalps;
 
     mapping (uint => Order) public orders;
+
+    INonfungiblePositionManager nonFungiblePositionManager = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
+
+    IUniswapV3Factory uniswapV3Factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
     uint public orderCount;
 
@@ -98,7 +105,10 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
 
       (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(orders[orderCount].lockedLiquidity);
 
-      // TODO: create uniswap v3 orders
+      address pool = factory.getPool(tokenInAddress, tokenOutAddress, 100);
+      nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
+        pool.token0(), pool.token1(), 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
+      ));
 
       emit NewOrder(
         orderCount,
