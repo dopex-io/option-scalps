@@ -45,9 +45,13 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       uint256 size;
       uint256 timeframeIndex;
       uint256 collateral;
-      uint256 entryLimit;
+      int24 tick0;
+      int24 tick1;
+      uint256 amount0;
+      uint256 amount1;
       uint256 expiry;
       uint256 lockedLiquidity;
+      uint256 positionId;
     }
 
     event NewOrder(uint id, address user);
@@ -69,8 +73,12 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       uint256 size,
       uint256 timeframeIndex,
       uint256 collateral, // margin + fees + premium
-      uint256 entryLimit,
-      uint256 expiry
+      int24 tick0,
+      int24 tick1,
+      uint256 amount0,
+      uint256 amount1,
+      uint256 expiry,
+      uint256 positionId
     )
     nonReentrant
     external
@@ -82,6 +90,21 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       require(collateral >= optionScalp.minimumMargin(), "Insufficient margin");
       require(size <= optionScalp.maxSize(), "Position exposure is too high");
 
+      (optionScalp.quote()).safeTransferFrom(
+          msg.sender,
+          address(this),
+          collateral
+      );
+
+      (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(orders[orderCount].lockedLiquidity);
+
+      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
+
+      nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
+        pool.token0(), pool.token1(), 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
+      ));
+      uint256 positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
+
       orders[orderCount] = Order({
         id: orderCount,
         optionScalp: _optionScalp,
@@ -92,23 +115,14 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
         size: size,
         timeframeIndex: timeframeIndex,
         collateral: collateral,
-        entryLimit: entryLimit,
+        tick0: tick0,
+        tick1: tick1,
+        amount0: amount0,
+        amount1: amount1,
         expiry: expiry,
-        lockedLiquidity: isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size
+        lockedLiquidity: isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size,
+        positionId: positionId
       });
-
-      (optionScalp.quote()).safeTransferFrom(
-          msg.sender,
-          address(this),
-          collateral
-      );
-
-      (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(orders[orderCount].lockedLiquidity);
-
-      address pool = factory.getPool(tokenInAddress, tokenOutAddress, 100);
-      nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
-        pool.token0(), pool.token1(), 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
-      ));
 
       emit NewOrder(
         orderCount,
@@ -131,18 +145,6 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
 
       uint markPrice = optionScalp.getMarkPrice();
 
-      if (orders[_id].isShort) {
-        require(
-          markPrice <= orders[_id].entryLimit, 
-          "Mark price must be lower than limit entry price"
-        );
-      } else {
-        require(
-          markPrice >= orders[_id].entryLimit, 
-          "Mark price must be greater than limit entry price"
-        );
-      }
-
       // Calculate premium for ATM option in quote
       uint256 premium = optionScalp.calcPremium(
           markPrice,
@@ -156,7 +158,9 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       require(orders[_id].collateral > premium + openingFees, "Insufficient margin");
 
       (orders[_id].isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).unlockLiquidity(orders[_id].lockedLiquidity);
-      // TODO: remove liquidity from Uniswap v3 and create position
+
+      (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(orders[_id].positionId);
+      nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(orders[_id].positionId, liquidity, 0, 0, block.timestamp));
 
       // ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
     }
