@@ -2,7 +2,6 @@
 pragma solidity ^0.8.9;
 
 import {IERC20} from "./interface/IERC20.sol";
-import {INonfungiblePositionManager} from "./interface/INonfungiblePositionManager.sol";
 import {IUniswapV3Factory} from "./interface/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
@@ -28,8 +27,6 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
     mapping (address => bool) optionScalps;
 
     mapping (uint => Order) public orders;
-
-    INonfungiblePositionManager nonFungiblePositionManager = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
     IUniswapV3Factory uniswapV3Factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
@@ -75,8 +72,6 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       uint256 collateral, // margin + fees + premium
       int24 tick0,
       int24 tick1,
-      uint256 amount0,
-      uint256 amount1,
       uint256 expiry,
       uint256 positionId
     )
@@ -98,12 +93,38 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
 
       (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(orders[orderCount].lockedLiquidity);
 
-      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
+      address base = address(optionScalp.base());
+      address quote = address(optionScalp.quote());
 
-      nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
-        pool.token0(), pool.token1(), 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
-      ));
-      uint256 positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
+      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
+
+      uint256 lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
+      address token0 = pool.token0();
+      address token1 = pool.token1();
+
+      uint256 amount0;
+      uint256 amount1;
+
+      if (base == token0) {
+          // amount0 is base
+          // amount1 is quote
+          if (isShort) amount0 = lockedLiquidity;
+          else amount1 = lockedLiquidity;
+      }  else {
+          // amount0 is quote
+          // amount1 is base
+          if (isShort) amount1 = lockedLiquidity;
+          else amount0 = lockedLiquidity;
+      }
+
+      uint256 positionId = optionScalp.mintUniswapV3Position(
+        token0,
+        token1,
+        tick0,
+        tick1,
+        amount0,
+        amount1
+      );
 
       orders[orderCount] = Order({
         id: orderCount,
@@ -120,7 +141,7 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
         amount0: amount0,
         amount1: amount1,
         expiry: expiry,
-        lockedLiquidity: isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size,
+        lockedLiquidity: lockedLiquidity,
         positionId: positionId
       });
 
@@ -143,26 +164,22 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       );
       OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
 
-      uint markPrice = optionScalp.getMarkPrice();
+      // TODO: get entry from tick
+      uint256 entry;
 
-      // Calculate premium for ATM option in quote
-      uint256 premium = optionScalp.calcPremium(
-          markPrice,
+      uint256 id = optionScalp.openPositionBurningUniswapV3Position(
+          orders[_id].positionId,
+          entry,
+          orders[_id].collateral,
           orders[_id].size,
-          optionScalp.timeframes(orders[_id].timeframeIndex)
+          orders[_id].timeframeIndex,
+          orders[_id].openingFees,
+          orders[_id].lockedLiquidity
       );
 
-      // Calculate opening fees in quote
-      uint256 openingFees = optionScalp.calcFees(orders[_id].size);
+      orders[_id].filled = true;
 
-      require(orders[_id].collateral > premium + openingFees, "Insufficient margin");
-
-      (orders[_id].isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).unlockLiquidity(orders[_id].lockedLiquidity);
-
-      (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(orders[_id].positionId);
-      nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(orders[_id].positionId, liquidity, 0, 0, block.timestamp));
-
-      // ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
+      ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
     }
     
     function cancelOrder(uint _id)

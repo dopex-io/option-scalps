@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {IERC20} from "./interface/IERC20.sol";
+import {INonfungiblePositionManager} from "./interface/INonfungiblePositionManager.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
 import {ContractWhitelist} from "./helpers/ContractWhitelist.sol";
 
@@ -47,6 +48,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
     // Uniswap V3 router
     IUniswapV3Router public uniswapV3Router;
+
+    // NonfungiblePositionManager
+    INonfungiblePositionManager nonFungiblePositionManager = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
     uint256[] public timeframes = [
         1 minutes,
@@ -606,6 +610,57 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
                 (int256(scalpPositions[id].positions) *
                     (int256(markPrice) - int256(scalpPositions[id].entry))) /
                 int256(10 ** quoteDecimals);
+    }
+
+    function mintUniswapV3Position(address token0, address token1, uint24 tick0, uint24 tick1, uint256 amount0, uint256 amount1) public returns (uint256 positionId) {
+      nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
+        token0, token1, 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
+      ));
+      positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
+    }
+
+    function openPositionBurningUniswapV3Position(uint256 positionId, uint256 entry, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 openingFees, uint256 lockedLiquidity) public returns (uint256 id) {
+      (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
+      nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
+
+      // TODO: check we switched ALL
+
+      uint markPrice = optionScalp.getMarkPrice();
+
+      // Calculate premium for ATM option in quote
+      uint256 premium = optionScalp.calcPremium(
+          markPrice,
+          size,
+          timeframes[orders[_id].timeframeIndex]
+      );
+
+      // Calculate opening fees in quote
+      uint256 openingFees = optionScalp.calcFees(size);
+
+      require(collateral > premium + openingFees, "Insufficient margin");
+
+      // Compute amountOut
+      uint256 amountOut = 0;
+
+      // Generate scalp position NFT
+      id = scalpPositionMinter.mint(msg.sender);
+      scalpPositions[id] = ScalpPosition({
+            isOpen: true,
+            isShort: isShort,
+            size: size,
+            positions: (size * (10 ** quoteDecimals)) / entry,
+            amountBorrowed: lockedLiquidity,
+            amountOut: amountOut,
+            entry: entry,
+            margin: margin,
+            premium: premium,
+            fees: openingFees,
+            pnl: 0,
+            openedAt: block.timestamp,
+            timeframe: timeframes[timeframeIndex]
+      });
+
+      emit OpenPosition(id, size, msg.sender);
     }
 
     /// @notice Public function to retrieve price of base asset from oracle
