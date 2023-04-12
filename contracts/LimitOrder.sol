@@ -164,12 +164,8 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       );
       OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
 
-      // TODO: get entry from tick
-      uint256 entry;
-
       uint256 id = optionScalp.openPositionBurningUniswapV3Position(
           orders[_id].positionId,
-          entry,
           orders[_id].collateral,
           orders[_id].size,
           orders[_id].timeframeIndex,

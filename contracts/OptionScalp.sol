@@ -20,6 +20,7 @@ import {IOptionPricing} from "./interface/IOptionPricing.sol";
 import {IVolatilityOracle} from "./interface/IVolatilityOracle.sol";
 import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
+import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
 
 contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     using SafeERC20 for IERC20;
@@ -619,11 +620,34 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
       positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
     }
 
-    function openPositionBurningUniswapV3Position(uint256 positionId, uint256 entry, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 openingFees, uint256 lockedLiquidity) public returns (uint256 id) {
-      (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
-      nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
+    function openPositionBurningUniswapV3Position(uint256 positionId, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 openingFees, uint256 lockedLiquidity) public returns (uint256 id) {
+      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
 
-      // TODO: check we switched ALL
+      (uint160 sqrtPriceX96, uint256 tick,,,,,) = pool.slot0();
+      int24 priceX96 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
+      uint256 entry = int256(LiquidityAmounts.getQuoteAtTick(tick, priceX96));
+
+      (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
+      (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
+
+      address token0 = pool.token0();
+      address token1 = pool.token1();
+
+      uint256 swapped;
+
+      if (base == token0) {
+          // amount0 is base
+          // amount1 is quote
+          if (isShort) amountOut = amount1;
+          else swapped = amount0;
+      }  else {
+          // amount0 is quote
+          // amount1 is base
+          if (isShort) amountOut = amount0;
+          else swapped = amount1;
+      }
+
+      uint256 entry = ((10 ** baseDecimals) * size) / swapped;
 
       uint markPrice = optionScalp.getMarkPrice();
 
