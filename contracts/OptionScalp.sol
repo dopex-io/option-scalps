@@ -613,20 +613,14 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
                 int256(10 ** quoteDecimals);
     }
 
-    function mintUniswapV3Position(address token0, address token1, uint24 tick0, uint24 tick1, uint256 amount0, uint256 amount1) public returns (uint256 positionId) {
+    function mintUniswapV3Position(address token0, address token1, int24 tick0, int24 tick1, uint256 amount0, uint256 amount1) public returns (uint256 positionId) {
       nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
         token0, token1, 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
       ));
       positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
     }
 
-    function openPositionBurningUniswapV3Position(uint256 positionId, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 openingFees, uint256 lockedLiquidity) public returns (uint256 id) {
-      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
-
-      (uint160 sqrtPriceX96, uint256 tick,,,,,) = pool.slot0();
-      int24 priceX96 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-      uint256 entry = int256(LiquidityAmounts.getQuoteAtTick(tick, priceX96));
-
+    function openPositionBurningUniswapV3Position(IUniswapV3Pool pool, bool isShort, uint256 positionId, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
       (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
       (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
 
@@ -635,31 +629,31 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
       uint256 swapped;
 
-      if (base == token0) {
+      if (address(base) == token0) {
           // amount0 is base
           // amount1 is quote
-          if (isShort) amountOut = amount1;
+          if (isShort) swapped = amount1;
           else swapped = amount0;
       }  else {
           // amount0 is quote
           // amount1 is base
-          if (isShort) amountOut = amount0;
+          if (isShort) swapped = amount0;
           else swapped = amount1;
       }
 
       uint256 entry = ((10 ** baseDecimals) * size) / swapped;
 
-      uint markPrice = optionScalp.getMarkPrice();
+      uint markPrice = getMarkPrice();
 
       // Calculate premium for ATM option in quote
-      uint256 premium = optionScalp.calcPremium(
+      uint256 premium = calcPremium(
           markPrice,
           size,
-          timeframes[orders[_id].timeframeIndex]
+          timeframes[timeframeIndex]
       );
 
       // Calculate opening fees in quote
-      uint256 openingFees = optionScalp.calcFees(size);
+      uint256 openingFees = calcFees(size);
 
       require(collateral > premium + openingFees, "Insufficient margin");
 
@@ -676,7 +670,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
             amountBorrowed: lockedLiquidity,
             amountOut: amountOut,
             entry: entry,
-            margin: margin,
+            margin: collateral - premium - openingFees,
             premium: premium,
             fees: openingFees,
             pnl: 0,

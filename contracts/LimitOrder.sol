@@ -164,12 +164,15 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
       );
       OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
 
+      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
+
       uint256 id = optionScalp.openPositionBurningUniswapV3Position(
+          pool,
+          orders[_id].isShort,
           orders[_id].positionId,
           orders[_id].collateral,
           orders[_id].size,
           orders[_id].timeframeIndex,
-          orders[_id].openingFees,
           orders[_id].lockedLiquidity
       );
 
