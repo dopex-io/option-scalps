@@ -19,6 +19,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Pausable} from "./helpers/Pausable.sol";
 
+import "hardhat/console.sol";
+
 contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
 
@@ -60,15 +62,12 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       }
     }
 
-    function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 size, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
+    function calcAmounts(uint256 lockedLiquidity, OptionScalp optionScalp, bool isShort) internal returns (address token0, address token1, uint256 amount0, uint256 amount1) {
           address base = address(optionScalp.base());
           address quote = address(optionScalp.quote());
           IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
-          address token0 = pool.token0();
-          address token1 = pool.token1();
-
-          uint256 amount0;
-          uint256 amount1;
+          token0 = pool.token0();
+          token1 = pool.token1();
 
           if (base == token0) {
               // amount0 is base
@@ -81,9 +80,20 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
               if (isShort) amount1 = lockedLiquidity;
               else amount0 = lockedLiquidity;
           }
+    }
 
+    function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 size, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
+          lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
 
+          (address token0, address token1, uint256 amount0, uint256 amount1) = calcAmounts(lockedLiquidity, optionScalp, isShort);
           (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
+
+          console.log(token0);
+          console.log(token1);
+          console.logInt(tick0);
+          console.logInt(tick1);
+          console.log(amount0);
+          console.log(amount1);
 
           positionId = optionScalp.mintUniswapV3Position(
               token0,
@@ -93,8 +103,6 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
               amount0,
               amount1
           );
-
-          lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
     }
 
     function createOrder(
@@ -105,8 +113,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       uint256 collateral, // margin + fees + premium
       int24 tick0,
       int24 tick1,
-      uint256 expiry,
-      uint256 positionId
+      uint256 expiry
     )
     nonReentrant
     external {

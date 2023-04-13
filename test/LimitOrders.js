@@ -149,7 +149,7 @@ describe("Limit orders", function () {
 
     const collateral = BigNumber.from('3000000000');
 
-    await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, collateral, "900000000", expiry);
+    await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, collateral, 10, 20, expiry);
 
     // User 2 tries to fill order
     await expect(limitOrders.connect(user2).fillOrder(0)).to.be.revertedWith('Mark price must be lower than limit entry price');

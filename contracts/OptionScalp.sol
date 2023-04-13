@@ -207,6 +207,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         base.approve(address(uniswapV3Router), type(uint256).max);
         quote.approve(address(uniswapV3Router), type(uint256).max);
 
+        base.approve(_limitOrdersManager, type(uint256).max);
+        quote.approve(_limitOrdersManager, type(uint256).max);
+
         quoteLp = new ScalpLP(address(this), _limitOrdersManager, address(quote), quote.symbol());
 
         baseLp = new ScalpLP(address(this), _limitOrdersManager, address(base), base.symbol());
@@ -619,10 +622,10 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     }
 
     function mintUniswapV3Position(address token0, address token1, int24 tick0, int24 tick1, uint256 amount0, uint256 amount1) public returns (uint256 positionId) {
-      require(msg.sender == address(limitOrderManager));
+      require(msg.sender == address(limitOrderManager), "Wrong sender");
 
       nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
-        token0, token1, 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
+        token0, token1, 500, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
       ));
       positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
     }
