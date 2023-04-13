@@ -60,7 +60,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       }
     }
 
-    function calcAmounts(OptionScalp optionScalp, int24 tick0, int24 tick1, address base, address quote, uint256 size, bool isShort, uint256 lockedLiquidity) internal returns (uint256 positionId) {
+    function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 size, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
+          address base = address(optionScalp.base());
+          address quote = address(optionScalp.quote());
           IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
           address token0 = pool.token0();
           address token1 = pool.token1();
@@ -80,6 +82,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
               else amount0 = lockedLiquidity;
           }
 
+
+          (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
+
           positionId = optionScalp.mintUniswapV3Position(
               token0,
               token1,
@@ -88,6 +93,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
               amount0,
               amount1
           );
+
+          lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
     }
 
     function createOrder(
@@ -116,20 +123,13 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           collateral
       );
 
-      uint256 lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
-
-      uint256 positionId = calcAmounts(
+      (uint256 positionId, uint256 lockedLiquidity) = createPosition(
         optionScalp,
         tick0,
         tick1,
-        address(optionScalp.base()),
-        address(optionScalp.quote()),
         size,
-        isShort,
-        lockedLiquidity
+        isShort
       );
-
-      (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
 
       orders[orderCount] = Order({
         id: orderCount,
