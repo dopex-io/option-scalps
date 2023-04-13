@@ -13,6 +13,7 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {ScalpPositionMinter} from "./positions/ScalpPositionMinter.sol";
+import {LimitOrderManager} from "./LimitOrderManager.sol";
 
 import {Pausable} from "./helpers/Pausable.sol";
 
@@ -96,6 +97,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
     // Scalp positions
     mapping(uint256 => ScalpPosition) public scalpPositions;
+
+    // Limit orders manager
+    LimitOrderManager public limitOrderManager;
 
     struct Configuration {
         // quoteDecimals Max size of a position
@@ -184,6 +188,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
         baseDecimals = _baseDecimals;
         quoteDecimals = _quoteDecimals;
         uniswapV3Router = IUniswapV3Router(_uniswapV3Router);
+        limitOrderManager = LimitOrderManager(_limitOrdersManager);
 
         maxSize = config.maxSize;
         maxOpenInterest = config.maxOpenInterest;
@@ -614,36 +619,42 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
     }
 
     function mintUniswapV3Position(address token0, address token1, int24 tick0, int24 tick1, uint256 amount0, uint256 amount1) public returns (uint256 positionId) {
+      require(msg.sender == address(limitOrderManager));
+
       nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
         token0, token1, 100, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
       ));
       positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
     }
 
-    function openPositionBurningUniswapV3Position(IUniswapV3Pool pool, bool isShort, uint256 positionId, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
-      (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
-      (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
+    function burnUniswapV3Position(IUniswapV3Pool pool, uint256 positionId, bool isShort) public returns (uint256 swapped) {
+        require(msg.sender == address(limitOrderManager));
 
-      address token0 = pool.token0();
-      address token1 = pool.token1();
+        (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
+        (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
 
-      uint256 swapped;
+        address token0 = pool.token0();
+        address token1 = pool.token1();
 
-      if (address(base) == token0) {
+        if (address(base) == token0) {
           // amount0 is base
           // amount1 is quote
           if (isShort) swapped = amount1;
           else swapped = amount0;
-      }  else {
+        }  else {
           // amount0 is quote
           // amount1 is base
           if (isShort) swapped = amount0;
           else swapped = amount1;
-      }
+        }
+    }
+
+    function openPositionFromLimitOrder(uint256 swapped, bool isShort, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
+      require(msg.sender == address(limitOrderManager));
 
       uint256 entry = ((10 ** baseDecimals) * size) / swapped;
 
-      uint markPrice = getMarkPrice();
+      uint256 markPrice = getMarkPrice();
 
       // Calculate premium for ATM option in quote
       uint256 premium = calcPremium(
@@ -657,9 +668,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
 
       require(collateral > premium + openingFees, "Insufficient margin");
 
-      // Compute amountOut
-      uint256 amountOut = 0;
-
       // Generate scalp position NFT
       id = scalpPositionMinter.mint(msg.sender);
       scalpPositions[id] = ScalpPosition({
@@ -668,7 +676,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
             size: size,
             positions: (size * (10 ** quoteDecimals)) / entry,
             amountBorrowed: lockedLiquidity,
-            amountOut: amountOut,
+            amountOut: swapped,
             entry: entry,
             margin: collateral - premium - openingFees,
             premium: premium,

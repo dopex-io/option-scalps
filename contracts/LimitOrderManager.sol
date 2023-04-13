@@ -19,7 +19,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Pausable} from "./helpers/Pausable.sol";
 
-contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
+contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
 
     uint256 MAX = 2**256 - 1;
@@ -166,10 +166,15 @@ contract LimitOrder is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ER
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
 
-      uint256 id = optionScalp.openPositionBurningUniswapV3Position(
+      uint256 swapped = optionScalp.burnUniswapV3Position(
           pool,
-          orders[_id].isShort,
           orders[_id].positionId,
+          orders[_id].isShort
+      );
+
+      uint256 id = optionScalp.openPositionFromLimitOrder(
+          swapped,
+          orders[_id].isShort,
           orders[_id].collateral,
           orders[_id].size,
           orders[_id].timeframeIndex,
