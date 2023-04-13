@@ -11,6 +11,7 @@ import {ScalpLP} from "./token/ScalpLP.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 
 import {ScalpPositionMinter} from "./positions/ScalpPositionMinter.sol";
 import {LimitOrderManager} from "./LimitOrderManager.sol";
@@ -23,7 +24,7 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
 
-contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist {
+contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
 
     // Base token
