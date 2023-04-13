@@ -632,7 +632,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     }
 
     function burnUniswapV3Position(IUniswapV3Pool pool, uint256 positionId, bool isShort) public returns (uint256 swapped) {
-        require(msg.sender == address(limitOrderManager));
+        require(msg.sender == address(limitOrderManager), "Wrong sender");
 
         (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
         (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
