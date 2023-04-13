@@ -42,10 +42,6 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       uint256 size;
       uint256 timeframeIndex;
       uint256 collateral;
-      int24 tick0;
-      int24 tick1;
-      uint256 amount0;
-      uint256 amount1;
       uint256 expiry;
       uint256 lockedLiquidity;
       uint256 positionId;
@@ -64,6 +60,36 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       }
     }
 
+    function calcAmounts(OptionScalp optionScalp, int24 tick0, int24 tick1, address base, address quote, uint256 size, bool isShort, uint256 lockedLiquidity) internal returns (uint256 positionId) {
+          IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
+          address token0 = pool.token0();
+          address token1 = pool.token1();
+
+          uint256 amount0;
+          uint256 amount1;
+
+          if (base == token0) {
+              // amount0 is base
+              // amount1 is quote
+              if (isShort) amount0 = lockedLiquidity;
+              else amount1 = lockedLiquidity;
+          }  else {
+              // amount0 is quote
+              // amount1 is base
+              if (isShort) amount1 = lockedLiquidity;
+              else amount0 = lockedLiquidity;
+          }
+
+          positionId = optionScalp.mintUniswapV3Position(
+              token0,
+              token1,
+              tick0,
+              tick1,
+              amount0,
+              amount1
+          );
+    }
+
     function createOrder(
       address _optionScalp,
       bool isShort,
@@ -76,8 +102,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       uint256 positionId
     )
     nonReentrant
-    external
-    returns (uint id) {
+    external {
       require(optionScalps[_optionScalp], "Invalid option scalp contract");
       OptionScalp optionScalp = OptionScalp(_optionScalp);
 
@@ -91,40 +116,20 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           collateral
       );
 
-      (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(orders[orderCount].lockedLiquidity);
-
-      address base = address(optionScalp.base());
-      address quote = address(optionScalp.quote());
-
-      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
-
       uint256 lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
-      address token0 = pool.token0();
-      address token1 = pool.token1();
 
-      uint256 amount0;
-      uint256 amount1;
-
-      if (base == token0) {
-          // amount0 is base
-          // amount1 is quote
-          if (isShort) amount0 = lockedLiquidity;
-          else amount1 = lockedLiquidity;
-      }  else {
-          // amount0 is quote
-          // amount1 is base
-          if (isShort) amount1 = lockedLiquidity;
-          else amount0 = lockedLiquidity;
-      }
-
-      uint256 positionId = optionScalp.mintUniswapV3Position(
-        token0,
-        token1,
+      uint256 positionId = calcAmounts(
+        optionScalp,
         tick0,
         tick1,
-        amount0,
-        amount1
+        address(optionScalp.base()),
+        address(optionScalp.quote()),
+        size,
+        isShort,
+        lockedLiquidity
       );
+
+      (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
 
       orders[orderCount] = Order({
         id: orderCount,
@@ -136,10 +141,6 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         size: size,
         timeframeIndex: timeframeIndex,
         collateral: collateral,
-        tick0: tick0,
-        tick1: tick1,
-        amount0: amount0,
-        amount1: amount1,
         expiry: expiry,
         lockedLiquidity: lockedLiquidity,
         positionId: positionId
@@ -157,7 +158,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     nonReentrant
     external {
       require(
-        !orders[_id].filled && 
+        !orders[_id].filled &&
         !orders[_id].cancelled &&
         block.timestamp <= orders[_id].expiry,
         "Order is not active and unfilled"
@@ -190,8 +191,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     nonReentrant
     external {
       require(
-        !orders[_id].filled && 
-        !orders[_id].cancelled, 
+        !orders[_id].filled &&
+        !orders[_id].cancelled,
         "Order is not active and unfilled"
       );
       require(msg.sender == orders[_id].user, "Only order creator can call cancel");
