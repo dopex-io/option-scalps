@@ -211,6 +211,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         base.approve(_limitOrdersManager, type(uint256).max);
         quote.approve(_limitOrdersManager, type(uint256).max);
 
+        base.approve(address(nonFungiblePositionManager), type(uint256).max);
+        quote.approve(address(nonFungiblePositionManager), type(uint256).max);
+
         quoteLp = new ScalpLP(address(this), _limitOrdersManager, address(quote), quote.symbol());
 
         baseLp = new ScalpLP(address(this), _limitOrdersManager, address(base), base.symbol());
