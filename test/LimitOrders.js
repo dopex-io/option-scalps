@@ -149,8 +149,10 @@ describe("Limit orders", function () {
 
     const collateral = BigNumber.from('3000000000');
 
-    const tick0 = Math.floor(Math.log("1000") / Math.log(1.0001));
+    const tick0 = Math.floor(Math.log("5000") / Math.log(1.0001));
     const tick1 = tick0 + 10;
+
+    console.log("Ticks: + ", tick0, tick1);
 
     await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, expiry);
 

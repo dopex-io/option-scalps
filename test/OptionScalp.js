@@ -50,7 +50,7 @@ describe("Option scalp", function () {
     const OptionPricing = await ethers.getContractFactory("MockOptionPricing");
     optionPricing = await OptionPricing.deploy();
 
-    const LimitOrders = await ethers.getContractFactory("LimitOrder");
+    const LimitOrders = await ethers.getContractFactory("LimitOrderManager");
     limitOrders = await LimitOrders.deploy([]);
 
     // Option scalp
