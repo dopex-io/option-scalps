@@ -23,6 +23,7 @@ describe("Option scalp", function() {
   let bf5Address;
   let b7b;
   let b7bAddress;
+  let limitOrders;
 
 
   before(async () => {
@@ -66,6 +67,9 @@ describe("Option scalp", function() {
     const OptionPricing = await ethers.getContractFactory("OptionPricingSimple");
     optionPricing = await OptionPricing.deploy(1000, 1);
 
+    const LimitOrders = await ethers.getContractFactory("LimitOrderManager");
+    limitOrders = await LimitOrders.deploy([]);
+
     // Option scalp
     const OptionScalp = await ethers.getContractFactory("OptionScalp");
     optionScalp = await OptionScalp.deploy(
@@ -74,6 +78,7 @@ describe("Option scalp", function() {
       18,
       6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
+      limitOrders.address,
       [
           "100000000000",  // $100.000
           "10000000000000",  // $10M
@@ -213,6 +218,7 @@ describe("Option scalp", function() {
       8,
       18,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
+      limitOrders.address,
       [
           "10000000000000000000",  // 10 ETH
           "1000000000000000000000",  // 1000 ETH

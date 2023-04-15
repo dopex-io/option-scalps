@@ -21,7 +21,6 @@ describe("Limit orders", function () {
   let b50Address;
   let bf5Address;
   let keeper;
-  let erc721;
 
   before(async () => {
     signers = await ethers.getSigners();
@@ -35,6 +34,17 @@ describe("Limit orders", function () {
   });
 
   it("should deploy option scalp", async function () {
+    await network.provider.request({
+      method: "hardhat_reset",
+      params: [
+        {
+          forking: {
+            jsonRpcUrl: process.env.ARBITRUM_NET_API_URL,
+            blockNumber: 44832616
+          }
+        }
+      ]
+    });
     // USDC
     usdc = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8");
     // WETH
