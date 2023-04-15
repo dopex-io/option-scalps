@@ -149,35 +149,44 @@ describe("Limit orders", function () {
 
     const collateral = BigNumber.from('3000000000');
 
-    const tick0 = Math.floor(Math.log("5000") / Math.log(1.0001));
+    const tick0 = -204000;
     const tick1 = tick0 + 10;
 
     console.log("Ticks: + ", tick0, tick1);
 
-    await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, expiry);
+    // (1.0001 ** (-204000)) * (10 ** 12) = 1383
 
-    // User 2 tries to fill order
-    await expect(limitOrders.connect(user2).fillOrder(0)).to.be.revertedWith('Mark price must be lower than limit entry price');
+    await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, expiry, {gasLimit: 4000000});
 
-    await priceOracle.updateUnderlyingPrice("890000000");
+    // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
+    await expect(limitOrders.connect(user2).fillOrder(0)).to.be.revertedWith('Order not filled');
 
+    const bf5UsdcBalance = await usdc.balanceOf(bf5Address);
+    await usdc.connect(bf5).approve(uniV3Router.address, bf5UsdcBalance);
+
+    expect(bf5UsdcBalance).to.eq(2440414348267);
+
+    await uniV3Router.connect(bf5).exactInputSingle({
+      tokenIn: usdc.address,
+      tokenOut: weth.address,
+      fee: 500,
+      recipient: b50Address,
+      deadline: "999999999999999999999999",
+      amountIn: bf5UsdcBalance,
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
+
+    // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
     await limitOrders.connect(user2).fillOrder(0);
 
-    // Check position
-    const scalpPosition = await optionScalp.scalpPositions(1);
-    expect(scalpPosition.size).to.eq("5000000000");
-
-    const scalpPositionMinter = await optionScalp.scalpPositionMinter();
-
-    const ERC721 = await ethers.getContractFactory("ERC721");
-    erc721 = await ERC721.attach(scalpPositionMinter);
-
-    const owner = await erc721.ownerOf(1);
-    expect(owner).to.eq(user1.address);
-
-    const endQuoteBalance = await usdc.balanceOf(user1.address);
-
-    const quoteOut = endQuoteBalance.sub(startQuoteBalance);
-    expect(quoteOut).to.eq(collateral * -1);
+    const position = await optionScalp.scalpPositions(1);
+    expect(position['isOpen']).to.eq(true);
+    expect(position['isShort']).to.eq(true);
+    expect(position['size']).to.eq('5000000000');
+    expect(position['amountBorrowed']).to.eq('5000000000000000000');
+    expect(position['entry']).to.eq('722682176087564233');
+    expect(position['margin']).to.eq('2972500000');
+    expect(position['premium']).to.eq('25000000');
   });
 });

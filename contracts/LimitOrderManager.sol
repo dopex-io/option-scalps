@@ -174,11 +174,15 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
 
+      console.log("Burn Uniswap V3 Position");
+
       uint256 swapped = optionScalp.burnUniswapV3Position(
           pool,
           orders[_id].positionId,
           orders[_id].isShort
       );
+
+      console.log("Open position from limit order");
 
       uint256 id = optionScalp.openPositionFromLimitOrder(
           swapped,
@@ -189,9 +193,13 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           orders[_id].lockedLiquidity
       );
 
+      console.log("Opened!");
+
       orders[_id].filled = true;
 
       ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
+
+      console.log("NFT has been transferred");
     }
     
     function cancelOrder(uint _id)

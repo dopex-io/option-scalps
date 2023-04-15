@@ -24,6 +24,8 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
 
+import "hardhat/console.sol";
+
 contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
 
@@ -629,7 +631,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
       require(msg.sender == address(limitOrderManager), "Wrong sender");
 
       nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
-        token0, token1, 500, tick0, tick1, 0, amount0, amount1, 0, address(this), block.timestamp
+        token0, token1, 500, tick0, tick1, amount0, amount1, 0, 0, address(this), block.timestamp
       ));
       positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
     }
@@ -658,8 +660,12 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
     function openPositionFromLimitOrder(uint256 swapped, bool isShort, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
       require(msg.sender == address(limitOrderManager));
+      require(swapped > 0, "Order not filled");
 
       uint256 entry = ((10 ** baseDecimals) * size) / swapped;
+
+      console.log("Entry");
+      console.log(entry);
 
       uint256 markPrice = getMarkPrice();
 
@@ -670,8 +676,14 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
           timeframes[timeframeIndex]
       );
 
+      console.log("Premium");
+      console.log(premium);
+
       // Calculate opening fees in quote
       uint256 openingFees = calcFees(size);
+
+      console.log("Opening fees");
+      console.log(openingFees);
 
       require(collateral > premium + openingFees, "Insufficient margin");
 
@@ -692,6 +704,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             openedAt: block.timestamp,
             timeframe: timeframes[timeframeIndex]
       });
+
+      console.log("Done!");
 
       emit OpenPosition(id, size, msg.sender);
     }
