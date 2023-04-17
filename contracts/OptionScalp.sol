@@ -151,8 +151,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         uint256 openedAt;
         // How long position is to be kept open
         uint256 timeframe;
-        // Is being closed with a limit order?
-        bool isClosing;
     }
 
     // Deposit event
@@ -436,8 +434,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             fees: openingFees,
             pnl: 0,
             openedAt: block.timestamp,
-            timeframe: timeframes[timeframeIndex],
-            isClosing: false
+            timeframe: timeframes[timeframeIndex]
         });
 
         emit OpenPosition(id, size, msg.sender);
@@ -733,8 +730,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             fees: openingFees,
             pnl: 0,
             openedAt: block.timestamp,
-            timeframe: timeframes[timeframeIndex],
-            isClosing: false
+            timeframe: timeframes[timeframeIndex]
       });
 
       console.log("Done!");

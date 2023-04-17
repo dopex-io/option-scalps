@@ -28,7 +28,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     mapping (address => bool) optionScalps;
 
-    mapping (uint => Order) public openOrders;
+    mapping (uint => Order) public openOrders; // identifier -> openOrder
+
+    mapping (uint => Order) public closeOrders; // scalpPositionId -> closeOrder
 
     IUniswapV3Factory uniswapV3Factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
@@ -167,8 +169,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       OptionScalp optionScalp = OptionScalp(_optionScalp);
         
       OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(id);
-      require(!scalpPosition.isClosing, "There is already an open order for this position");
-        
+      require(closeOrders[id].user == address(0), "There is already an open order for this position");
+
       (uint256 positionId, uint256 lockedLiquidity) = createPosition(
         optionScalp,
         tick0,
