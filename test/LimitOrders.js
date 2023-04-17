@@ -166,7 +166,7 @@ describe("Limit orders", function () {
 
     // (1.0001 ** (-204000)) * (10 ** 12) = 1383
 
-    await limitOrders.connect(user1).createOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, expiry, {gasLimit: 4000000});
+    await limitOrders.connect(user1).createOpenOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, expiry, {gasLimit: 4000000});
 
     // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
     await expect(limitOrders.connect(user2).fillOrder(0)).to.be.revertedWith('Order not filled');

@@ -28,7 +28,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     mapping (address => bool) optionScalps;
 
-    mapping (uint => Order) public orders;
+    mapping (uint => Order) public openOrders;
 
     IUniswapV3Factory uniswapV3Factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
@@ -82,18 +82,10 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           }
     }
 
-    function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 size, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
-          lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
+    function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 amount, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
+          lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * amount / optionScalp.getMarkPrice() : amount;
 
           (address token0, address token1, uint256 amount0, uint256 amount1) = calcAmounts(lockedLiquidity, optionScalp, isShort);
-          (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
-
-          console.log(token0);
-          console.log(token1);
-          console.logInt(tick0);
-          console.logInt(tick1);
-          console.log(amount0);
-          console.log(amount1);
 
           positionId = optionScalp.mintUniswapV3Position(
               token0,
@@ -105,7 +97,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           );
     }
 
-    function createOrder(
+    function createOpenOrder(
       address _optionScalp,
       bool isShort,
       uint256 size,
@@ -138,7 +130,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         isShort
       );
 
-      orders[orderCount] = Order({
+      (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
+
+      openOrders[orderCount] = Order({
         id: orderCount,
         optionScalp: _optionScalp,
         user: msg.sender,
@@ -160,17 +154,40 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       orderCount++;
     }
+    
+    function createCloseOrder(
+        address _optionScalp,
+        uint256 id,
+        int24 tick0,
+        int24 tick1
+    )
+    nonReentrant
+    external {
+      require(optionScalps[_optionScalp], "Invalid option scalp contract");
+      OptionScalp optionScalp = OptionScalp(_optionScalp);
+        
+      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(id);
+      require(!scalpPosition.isClosing, "There is already an open order for this position");
+        
+      (uint256 positionId, uint256 lockedLiquidity) = createPosition(
+        optionScalp,
+        tick0,
+        tick1,
+        scalpPosition.amountOut,
+        scalpPosition.isShort
+      );
+    }
 
     function fillOrder(uint _id)
     nonReentrant
     external {
       require(
-        !orders[_id].filled &&
-        !orders[_id].cancelled &&
-        block.timestamp <= orders[_id].expiry,
+        !openOrders[_id].filled &&
+        !openOrders[_id].cancelled &&
+        block.timestamp <= openOrders[_id].expiry,
         "Order is not active and unfilled"
       );
-      OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
+      OptionScalp optionScalp = OptionScalp(openOrders[_id].optionScalp);
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
 
@@ -178,26 +195,26 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       uint256 swapped = optionScalp.burnUniswapV3Position(
           pool,
-          orders[_id].positionId,
-          orders[_id].isShort
+          openOrders[_id].positionId,
+          openOrders[_id].isShort
       );
 
       console.log("Open position from limit order");
 
       uint256 id = optionScalp.openPositionFromLimitOrder(
           swapped,
-          orders[_id].isShort,
-          orders[_id].collateral,
-          orders[_id].size,
-          orders[_id].timeframeIndex,
-          orders[_id].lockedLiquidity
+          openOrders[_id].isShort,
+          openOrders[_id].collateral,
+          openOrders[_id].size,
+          openOrders[_id].timeframeIndex,
+          openOrders[_id].lockedLiquidity
       );
 
       console.log("Opened!");
 
-      orders[_id].filled = true;
+      openOrders[_id].filled = true;
 
-      ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), orders[_id].user, id);
+      ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), openOrders[_id].user, id);
 
       console.log("NFT has been transferred");
     }
@@ -206,19 +223,19 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     nonReentrant
     external {
       require(
-        !orders[_id].filled &&
-        !orders[_id].cancelled,
+        !openOrders[_id].filled &&
+        !openOrders[_id].cancelled,
         "Order is not active and unfilled"
       );
-      require(msg.sender == orders[_id].user, "Only order creator can call cancel");
-      orders[_id].cancelled = true;
+      require(msg.sender == openOrders[_id].user, "Only order creator can call cancel");
+      openOrders[_id].cancelled = true;
 
-      OptionScalp optionScalp = OptionScalp(orders[_id].optionScalp);
+      OptionScalp optionScalp = OptionScalp(openOrders[_id].optionScalp);
 
       (optionScalp.quote()).safeTransferFrom(
           address(this),
-          orders[_id].user,
-          orders[_id].collateral
+          openOrders[_id].user,
+          openOrders[_id].collateral
       );
 
       emit CancelOrder(_id, msg.sender);

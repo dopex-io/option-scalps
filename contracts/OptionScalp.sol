@@ -151,6 +151,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         uint256 openedAt;
         // How long position is to be kept open
         uint256 timeframe;
+        // Is being closed with a limit order?
+        bool isClosing;
     }
 
     // Deposit event
@@ -222,6 +224,10 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
         quote.approve(address(quoteLp), type(uint256).max);
         base.approve(address(baseLp), type(uint256).max);
+    }
+
+    function getPosition(uint256 id) public returns (ScalpPosition memory) {
+        return scalpPositions[id];
     }
 
     /// @notice Internal function to handle swaps using Uniswap V3 exactOutput
@@ -430,7 +436,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             fees: openingFees,
             pnl: 0,
             openedAt: block.timestamp,
-            timeframe: timeframes[timeframeIndex]
+            timeframe: timeframes[timeframeIndex],
+            isClosing: false
         });
 
         emit OpenPosition(id, size, msg.sender);
@@ -630,9 +637,33 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     function mintUniswapV3Position(address token0, address token1, int24 tick0, int24 tick1, uint256 amount0, uint256 amount1) public returns (uint256 positionId) {
       require(msg.sender == address(limitOrderManager), "Wrong sender");
 
+      uint256 token0StartBalance = IERC20(token0).balanceOf(address(this));
+      uint256 token1StartBalance = IERC20(token1).balanceOf(address(this));
+
+      console.log("Token 0 start balance");
+      console.log(token0StartBalance);
+      console.log("Token 1 start balance");
+      console.log(token1StartBalance);
+
       nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
         token0, token1, 500, tick0, tick1, amount0, amount1, 0, 0, address(this), block.timestamp
       ));
+
+      uint256 token0EndBalance = IERC20(token0).balanceOf(address(this));
+      uint256 token1EndBalance = IERC20(token1).balanceOf(address(this));
+
+      console.log("Token 0 end balance");
+      console.log(token0EndBalance);
+      console.log("Token 1 end balance");
+      console.log(token1EndBalance);
+
+      console.log("Difference");
+      console.log(token0StartBalance - token0EndBalance);
+      console.log(token1StartBalance - token1EndBalance);
+
+      require(token0StartBalance - token0EndBalance >= amount0 * 999999 / 1000000, "Invalid ticks");
+      require(token1StartBalance - token1EndBalance >= amount1 * 999999 / 1000000, "Invalid ticks");
+
       positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
     }
 
@@ -702,7 +733,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             fees: openingFees,
             pnl: 0,
             openedAt: block.timestamp,
-            timeframe: timeframes[timeframeIndex]
+            timeframe: timeframes[timeframeIndex],
+            isClosing: false
       });
 
       console.log("Done!");
