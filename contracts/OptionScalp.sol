@@ -642,6 +642,11 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
       console.log("Token 1 start balance");
       console.log(token1StartBalance);
 
+      console.log("Amount 0");
+      console.log(amount0);
+      console.log("Amount 1");
+      console.log(amount1);
+
       nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
         token0, token1, 500, tick0, tick1, amount0, amount1, 0, 0, address(this), block.timestamp
       ));
@@ -673,22 +678,46 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         address token0 = pool.token0();
         address token1 = pool.token1();
 
+        console.log("Collecting");
+
+        nonFungiblePositionManager.collect(INonfungiblePositionManager.CollectParams(positionId, address(this), uint128(amount0), uint128(amount1)));
+
+        console.log("Withdrawing");
+        console.log(amount0);
+        console.log(amount1);
+        console.log("Is short?");
+        console.log(isShort);
+
         if (address(base) == token0) {
           // amount0 is base
           // amount1 is quote
-          if (isShort) swapped = amount1;
-          else swapped = amount0;
+          if (isShort) {
+              swapped = amount1;
+              require(amount0 == 0, "Not totally filled");
+          }
+          else {
+              swapped = amount0;
+              require(amount1 == 0, "Not totally filled");
+          }
         }  else {
           // amount0 is quote
           // amount1 is base
-          if (isShort) swapped = amount0;
-          else swapped = amount1;
+          if (isShort) {
+              swapped = amount0;
+              require(amount1 == 0, "Not totally filled");
+          }
+          else {
+              swapped = amount1;
+              require(amount0 == 0, "Not totally filled");
+          }
         }
     }
 
     function openPositionFromLimitOrder(uint256 swapped, bool isShort, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
       require(msg.sender == address(limitOrderManager));
       require(swapped > 0, "Order not filled");
+
+      openInterest[isShort] += size;
 
       uint256 entry = ((10 ** baseDecimals) * size) / swapped;
 
@@ -737,6 +766,80 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
       emit OpenPosition(id, size, msg.sender);
     }
+
+    function closePositionFromLimitOrder(uint256 id, uint256 swapped) public {
+        require(msg.sender == address(limitOrderManager));
+        require(swapped > 0, "Order not filled");
+
+        require(scalpPositions[id].isOpen, "Invalid position ID");
+        require(
+            scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
+            "Position must be open for at least 1 second"
+        );
+
+        address owner = IERC721(scalpPositionMinter).ownerOf(id);
+
+        uint256 traderWithdraw;
+
+        scalpPositions[id].isOpen = false;
+        scalpPositionMinter.burn(id);
+
+        console.log("Logic");
+
+        if (scalpPositions[id].isShort) {
+            // quote to base
+            if (swapped > scalpPositions[id].amountBorrowed) {
+                baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
+
+                //convert remaining base to quote to pay for trader
+                traderWithdraw = _swapExactIn(
+                    address(base),
+                    address(quote),
+                    swapped - scalpPositions[id].amountBorrowed
+                );
+
+                quote.safeTransfer(
+                    isLiquidatable(id) ? insuranceFund : owner,
+                    traderWithdraw
+                );
+            } else {
+                baseLp.unlockLiquidity(swapped);
+                emit Shortfall(false, scalpPositions[id].amountBorrowed - swapped);
+            }
+        } else {
+            // base to quote
+            if (
+                scalpPositions[id].margin + swapped >
+                scalpPositions[id].amountBorrowed
+            ) {
+                quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
+
+                traderWithdraw =
+                    scalpPositions[id].margin +
+                    swapped -
+                    scalpPositions[id].amountBorrowed;
+
+                quote.safeTransfer(
+                    isLiquidatable(id) ? insuranceFund : owner,
+                    traderWithdraw
+                );
+            } else {
+                quoteLp.unlockLiquidity(scalpPositions[id].margin + swapped);
+                emit Shortfall(true, scalpPositions[id].amountBorrowed - scalpPositions[id].margin + swapped);
+            }
+        }
+
+        console.log("Final");
+
+        openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
+        int256 pnl = int256(traderWithdraw) - int256(scalpPositions[id].margin + scalpPositions[id].premium + scalpPositions[id].fees);
+        scalpPositions[id].pnl = pnl;
+        cumulativePnl[owner] += pnl;
+        cumulativeVolume[owner] += scalpPositions[id].size;
+
+        emit ClosePosition(id, pnl, msg.sender);
+    }
+
 
     /// @notice Public function to retrieve price of base asset from oracle
     /// @param price Mark price (quoteDecimals)

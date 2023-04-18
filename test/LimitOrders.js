@@ -151,8 +151,6 @@ describe("Limit orders", function () {
 
     await usdc.connect(user1).approve(limitOrders.address, "10000000000");
 
-    const expiry = "999999999999999999999999999999999999"
-
     const markPrice = await optionScalp.getMarkPrice();
 
     expect(markPrice).to.eq(1000000000);
@@ -166,10 +164,10 @@ describe("Limit orders", function () {
 
     // (1.0001 ** (-204000)) * (10 ** 12) = 1383
 
-    await limitOrders.connect(user1).createOpenOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, expiry, {gasLimit: 4000000});
+    await limitOrders.connect(user1).createOpenOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, {gasLimit: 4000000});
 
     // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
-    await expect(limitOrders.connect(user2).fillOrder(0)).to.be.revertedWith('Order not filled');
+    await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not totally filled');
 
     const bf5UsdcBalance = await usdc.balanceOf(bf5Address);
     await usdc.connect(bf5).approve(uniV3Router.address, bf5UsdcBalance);
@@ -180,17 +178,20 @@ describe("Limit orders", function () {
       tokenIn: usdc.address,
       tokenOut: weth.address,
       fee: 500,
-      recipient: b50Address,
+      recipient: bf5Address,
       deadline: "999999999999999999999999",
       amountIn: bf5UsdcBalance,
       amountOutMinimum: 1,
       sqrtPriceLimitX96: 0,
     });
 
-    // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
-    await limitOrders.connect(user2).fillOrder(0);
+    console.log("Uniswap");
+
+    // Bot is triggered
+    await limitOrders.connect(user2).fillOpenOrder(0);
 
     const position = await optionScalp.scalpPositions(1);
+    console.log(position);
     expect(position['isOpen']).to.eq(true);
     expect(position['isShort']).to.eq(true);
     expect(position['size']).to.eq('5000000000');
@@ -198,5 +199,43 @@ describe("Limit orders", function () {
     expect(position['entry']).to.eq('722682176087564233');
     expect(position['margin']).to.eq('2972500000');
     expect(position['premium']).to.eq('25000000');
+    expect(position['amountOut']).to.eq('6918670704');
+  });
+
+  it("user 1 closes the short scalp position using a limit order", async function () {
+    const tick0 = -204100;
+    const tick1 = tick0 + 10;
+
+    console.log("Ticks: + ", tick0, tick1);
+
+    // (1.0001 ** (-204100)) * (10 ** 12) = 1369
+
+    // Create an order to close the position
+    await limitOrders.connect(user1).createCloseOrder(optionScalp.address, 1, tick0, tick1);
+
+    // Bot tries to close the position but price hasn't moved and Uniswap NFT order hasn't been filled
+    await expect(limitOrders.connect(user2).fillCloseOrder(1)).to.be.revertedWith('Not totally filled');
+
+    // Price goes down
+    const bf5WethBalance = await weth.balanceOf(bf5Address);
+    await weth.connect(bf5).approve(uniV3Router.address, bf5WethBalance);
+
+    expect(bf5WethBalance).to.eq("1825577554431309211987");
+
+    await uniV3Router.connect(bf5).exactInputSingle({
+      tokenIn: weth.address,
+      tokenOut: usdc.address,
+      fee: 500,
+      recipient: bf5Address,
+      deadline: "999999999999999999999999",
+      amountIn: bf5WethBalance,
+      amountOutMinimum: 1,
+      sqrtPriceLimitX96: 0,
+    });
+
+    console.log("Uniswap");
+
+    // Bot is triggered
+    await limitOrders.connect(user2).fillCloseOrder(1);
   });
 });
