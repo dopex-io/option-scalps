@@ -169,6 +169,9 @@ describe("Limit orders", function () {
     // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
     await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not totally filled');
 
+    // Callstatic try cancel order
+    await limitOrders.connect(user1).callStatic.cancelOpenOrder(0);
+
     const bf5UsdcBalance = await usdc.balanceOf(bf5Address);
     await usdc.connect(bf5).approve(uniV3Router.address, bf5UsdcBalance);
 

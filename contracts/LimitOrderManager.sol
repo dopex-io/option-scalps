@@ -26,6 +26,13 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     uint256 MAX = 2**256 - 1;
 
+    uint256 public maxFundingTime = 4 hours;
+
+    uint256 public fundingRate = 1825000000; // 18.25% annualized (0.002% per hour)
+
+    // Used for percentages
+    uint256 public constant divisor = 1e8;
+
     mapping (address => bool) optionScalps;
 
     mapping (uint => OpenOrder) public openOrders; // identifier -> openOrder
@@ -280,18 +287,22 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         "Order is not active and unfilled"
       );
 
-      // TODO: allow bots to cancel orders after a certain number hours
-      require(msg.sender == openOrders[_id].user, "Only order creator can call cancel");
+      if (openOrders[_id].timestamp + maxFundingTime <= block.timestamp) require(msg.sender == openOrders[_id].user, "Only order creator can call cancel before expiry");
       openOrders[_id].cancelled = true;
 
       OptionScalp optionScalp = OptionScalp(openOrders[_id].optionScalp);
 
-      // TODO: subtract fees
-      (optionScalp.quote()).safeTransferFrom(
-          address(this),
-          openOrders[_id].user,
-          openOrders[_id].collateral
+      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
+
+      optionScalp.burnUniswapV3Position(
+          pool,
+          openOrders[_id].positionId,
+          !openOrders[_id].isShort
       );
+
+      uint256 fees = (openOrders[_id].collateral * fundingRate / divisor) / uint256(365 days);
+
+      optionScalp.settleOpenOrderDeletion(openOrders[_id].user, openOrders[_id].isShort, openOrders[_id].collateral - fees, fees);
 
       emit CancelOrder(_id, msg.sender);
     }

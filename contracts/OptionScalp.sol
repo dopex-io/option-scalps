@@ -805,6 +805,21 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         }
     }
 
+    function settleOpenOrderDeletion(address user, bool isQuote, uint256 amount, uint256 fees) external {
+        require(msg.sender == address(limitOrderManager));
+
+        quote.safeTransfer(user, amount);
+
+        if (isQuote) {
+            quoteLp.addProceeds(fees);
+        } else {
+            uint256 amountOut = _swapExactIn(address(quote), address(base), fees);
+            baseLp.addProceeds(amountOut);
+        }
+
+        emit AddProceeds(isQuote, amount);
+    }
+
     /// @notice Public function to retrieve price of base asset from oracle
     /// @param price Mark price (quoteDecimals)
     function getMarkPrice() public view returns (uint256 price) {
