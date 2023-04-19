@@ -279,6 +279,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         !openOrders[_id].cancelled,
         "Order is not active and unfilled"
       );
+
+      // TODO: allow bots to cancel orders after a certain number hours
       require(msg.sender == openOrders[_id].user, "Only order creator can call cancel");
       openOrders[_id].cancelled = true;
 
