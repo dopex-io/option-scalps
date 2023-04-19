@@ -10,4 +10,5 @@ interface IUniswapV3Pool {
         uint8 feeProtocol,
         bool unlocked
     );
+    function tickSpacing() external view returns (int24);
 }

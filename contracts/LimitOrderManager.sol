@@ -69,12 +69,16 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       }
     }
 
-    function calcAmounts(uint256 lockedLiquidity, OptionScalp optionScalp, bool isShort) internal returns (address token0, address token1, uint256 amount0, uint256 amount1) {
+    function calcAmounts(uint256 lockedLiquidity, OptionScalp optionScalp, bool isShort, int24 tick0, int24 tick1) internal returns (address token0, address token1, uint256 amount0, uint256 amount1) {
           address base = address(optionScalp.base());
           address quote = address(optionScalp.quote());
           IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
           token0 = pool.token0();
           token1 = pool.token1();
+
+          int24 tickSpacing = pool.tickSpacing();
+
+          require(tick1 - tick0 == tickSpacing, "Invalid ticks");
 
           if (base == token0) {
               // amount0 is base
@@ -92,7 +96,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 amount, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
           lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * amount / optionScalp.getMarkPrice() : amount;
 
-          (address token0, address token1, uint256 amount0, uint256 amount1) = calcAmounts(lockedLiquidity, optionScalp, isShort);
+          (address token0, address token1, uint256 amount0, uint256 amount1) = calcAmounts(lockedLiquidity, optionScalp, isShort, tick0, tick1);
 
           positionId = optionScalp.mintUniswapV3Position(
               token0,
@@ -280,6 +284,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       OptionScalp optionScalp = OptionScalp(openOrders[_id].optionScalp);
 
+      // TODO: subtract fees
       (optionScalp.quote()).safeTransferFrom(
           address(this),
           openOrders[_id].user,
@@ -287,5 +292,35 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       );
 
       emit CancelOrder(_id, msg.sender);
+    }
+
+    function cancelCloseOrder(uint _id)
+    nonReentrant
+    external {
+      require(
+        isCloseOrderActive(_id),
+        "Order is not active and unfilled"
+      );
+
+      OptionScalp optionScalp = OptionScalp(closeOrders[_id].optionScalp);
+      require(msg.sender == optionScalp.positionOwner(_id) || optionScalps[msg.sender], "Sender not authorized");
+
+      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(_id);
+
+      IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
+
+      uint256 swapped = optionScalp.burnUniswapV3Position(
+          pool,
+          closeOrders[_id].positionId,
+          !scalpPosition.isShort
+      );
+
+      delete closeOrders[_id];
+
+      emit CancelOrder(_id, msg.sender);
+    }
+
+    function isCloseOrderActive(uint256 _id) public returns (bool) {
+        return !closeOrders[_id].filled && closeOrders[_id].optionScalp != address(0);
     }
 }

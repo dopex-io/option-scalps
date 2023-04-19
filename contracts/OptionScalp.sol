@@ -320,7 +320,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     /// @notice Opens a position against/in favour of the base asset (if you short base is swapped to quote)
     /// @param size Size of position (quoteDecimals)
     /// @param timeframeIndex Position of the array
-    /// @param margin Collateral posted by user
+    /// @param margin Margin posted by user
     /// @param entryLimit Minimum or maximum entry price (for short or long)
     function openPosition(
         bool isShort,
@@ -440,20 +440,84 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         emit OpenPosition(id, size, msg.sender);
     }
 
+    /// @notice Opens a position against/in favour of the base asset using limit orders
+    /// @param swapped Amount obtained destroying the position nft
+    /// @param isShort If true position is short
+    /// @param collateral Collateral posted by user
+    /// @param size Size of position (quoteDecimals)
+    /// @param timeframeIndex Position of the array
+    /// @param lockedLiquidity Liquidity locked into the position nft
+    function openPositionFromLimitOrder(uint256 swapped, bool isShort, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
+      require(msg.sender == address(limitOrderManager));
+      require(swapped > 0, "Order not filled");
+
+      openInterest[isShort] += size;
+
+      uint256 entry = ((10 ** baseDecimals) * size) / swapped;
+
+      console.log("Entry");
+      console.log(entry);
+
+      uint256 markPrice = getMarkPrice();
+
+      // Calculate premium for ATM option in quote
+      uint256 premium = calcPremium(
+          markPrice,
+          size,
+          timeframes[timeframeIndex]
+      );
+
+      console.log("Premium");
+      console.log(premium);
+
+      // Calculate opening fees in quote
+      uint256 openingFees = calcFees(size);
+
+      console.log("Opening fees");
+      console.log(openingFees);
+
+      require(collateral > premium + openingFees, "Insufficient margin");
+
+      // Generate scalp position NFT
+      id = scalpPositionMinter.mint(msg.sender);
+      scalpPositions[id] = ScalpPosition({
+            isOpen: true,
+            isShort: isShort,
+            size: size,
+            positions: (size * (10 ** quoteDecimals)) / entry,
+            amountBorrowed: lockedLiquidity,
+            amountOut: swapped,
+            entry: entry,
+            margin: collateral - premium - openingFees,
+            premium: premium,
+            fees: openingFees,
+            pnl: 0,
+            openedAt: block.timestamp,
+            timeframe: timeframes[timeframeIndex]
+      });
+
+      console.log("Done!");
+
+      emit OpenPosition(id, size, msg.sender);
+    }
+
     /// @notice Closes an open position
     /// @param id ID of position
     function closePosition(uint256 id) public {
         _isEligibleSender();
 
-        require(scalpPositions[id].isOpen, "Invalid position ID");
-        require(
-            scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
-            "Position must be open for at least 1 second"
-        );
+        // Cancel close order if exists
+        console.log(address(limitOrderManager));
+        console.log(limitOrderManager.isCloseOrderActive(id));
+        if (limitOrderManager.isCloseOrderActive(id)) limitOrderManager.cancelCloseOrder(id);
 
-        address owner = IERC721(scalpPositionMinter).ownerOf(id);
+        console.log("IS LIQUIDATABLE");
+        console.log(isLiquidatable(id));
 
-        if (!isLiquidatable(id) && msg.sender != owner)
+        console.log("IS EXPIRED");
+        console.log(block.timestamp >= scalpPositions[id].openedAt + scalpPositions[id].timeframe);
+
+        if (!isLiquidatable(id) && msg.sender != IERC721(scalpPositionMinter).ownerOf(id))
             require(
                 block.timestamp >=
                     scalpPositions[id].openedAt + scalpPositions[id].timeframe,
@@ -461,10 +525,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             );
 
         uint256 swapped;
-        uint256 traderWithdraw;
-
-        scalpPositions[id].isOpen = false;
-        scalpPositionMinter.burn(id);
 
         if (scalpPositions[id].isShort) {
             // quote to base
@@ -473,7 +533,46 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
                 address(base),
                 scalpPositions[id].amountOut + scalpPositions[id].margin
             );
+        } else {
+            // base to quote
+            swapped = _swapExactIn(
+                address(base),
+                address(quote),
+                scalpPositions[id].amountOut
+            );
+        }
 
+        settlePosition(id, swapped);
+    }
+
+    /// @notice Closes an open position from a limit order
+    /// @param id ID of position
+    /// @param swapped Amount obtained from the swap
+    function closePositionFromLimitOrder(uint256 id, uint256 swapped) public {
+        require(msg.sender == address(limitOrderManager));
+        require(swapped > 0, "Order not filled");
+
+        settlePosition(id, swapped);
+    }
+
+    /// @notice Internal function called to finalize a position close
+    /// @param id ID of position
+    /// @param swapped Amount obtained from the swap
+    function settlePosition(uint256 id, uint256 swapped) internal {
+        require(scalpPositions[id].isOpen, "Invalid position ID");
+        require(
+            scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
+            "Position must be open for at least 1 second"
+        );
+
+        address owner = IERC721(scalpPositionMinter).ownerOf(id);
+
+        uint256 traderWithdraw;
+
+        scalpPositions[id].isOpen = false;
+        scalpPositionMinter.burn(id);
+
+        if (scalpPositions[id].isShort) {
             if (swapped > scalpPositions[id].amountBorrowed) {
                 baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
@@ -493,13 +592,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
                 emit Shortfall(false, scalpPositions[id].amountBorrowed - swapped);
             }
         } else {
-            // base to quote
-            swapped = _swapExactIn(
-                address(base),
-                address(quote),
-                scalpPositions[id].amountOut
-            );
-
             if (
                 scalpPositions[id].margin + swapped >
                 scalpPositions[id].amountBorrowed
@@ -713,138 +805,16 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         }
     }
 
-    function openPositionFromLimitOrder(uint256 swapped, bool isShort, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
-      require(msg.sender == address(limitOrderManager));
-      require(swapped > 0, "Order not filled");
-
-      openInterest[isShort] += size;
-
-      uint256 entry = ((10 ** baseDecimals) * size) / swapped;
-
-      console.log("Entry");
-      console.log(entry);
-
-      uint256 markPrice = getMarkPrice();
-
-      // Calculate premium for ATM option in quote
-      uint256 premium = calcPremium(
-          markPrice,
-          size,
-          timeframes[timeframeIndex]
-      );
-
-      console.log("Premium");
-      console.log(premium);
-
-      // Calculate opening fees in quote
-      uint256 openingFees = calcFees(size);
-
-      console.log("Opening fees");
-      console.log(openingFees);
-
-      require(collateral > premium + openingFees, "Insufficient margin");
-
-      // Generate scalp position NFT
-      id = scalpPositionMinter.mint(msg.sender);
-      scalpPositions[id] = ScalpPosition({
-            isOpen: true,
-            isShort: isShort,
-            size: size,
-            positions: (size * (10 ** quoteDecimals)) / entry,
-            amountBorrowed: lockedLiquidity,
-            amountOut: swapped,
-            entry: entry,
-            margin: collateral - premium - openingFees,
-            premium: premium,
-            fees: openingFees,
-            pnl: 0,
-            openedAt: block.timestamp,
-            timeframe: timeframes[timeframeIndex]
-      });
-
-      console.log("Done!");
-
-      emit OpenPosition(id, size, msg.sender);
-    }
-
-    function closePositionFromLimitOrder(uint256 id, uint256 swapped) public {
-        require(msg.sender == address(limitOrderManager));
-        require(swapped > 0, "Order not filled");
-
-        require(scalpPositions[id].isOpen, "Invalid position ID");
-        require(
-            scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
-            "Position must be open for at least 1 second"
-        );
-
-        address owner = IERC721(scalpPositionMinter).ownerOf(id);
-
-        uint256 traderWithdraw;
-
-        scalpPositions[id].isOpen = false;
-        scalpPositionMinter.burn(id);
-
-        console.log("Logic");
-
-        if (scalpPositions[id].isShort) {
-            // quote to base
-            if (swapped > scalpPositions[id].amountBorrowed) {
-                baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
-
-                //convert remaining base to quote to pay for trader
-                traderWithdraw = _swapExactIn(
-                    address(base),
-                    address(quote),
-                    swapped - scalpPositions[id].amountBorrowed
-                );
-
-                quote.safeTransfer(
-                    isLiquidatable(id) ? insuranceFund : owner,
-                    traderWithdraw
-                );
-            } else {
-                baseLp.unlockLiquidity(swapped);
-                emit Shortfall(false, scalpPositions[id].amountBorrowed - swapped);
-            }
-        } else {
-            // base to quote
-            if (
-                scalpPositions[id].margin + swapped >
-                scalpPositions[id].amountBorrowed
-            ) {
-                quoteLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
-
-                traderWithdraw =
-                    scalpPositions[id].margin +
-                    swapped -
-                    scalpPositions[id].amountBorrowed;
-
-                quote.safeTransfer(
-                    isLiquidatable(id) ? insuranceFund : owner,
-                    traderWithdraw
-                );
-            } else {
-                quoteLp.unlockLiquidity(scalpPositions[id].margin + swapped);
-                emit Shortfall(true, scalpPositions[id].amountBorrowed - scalpPositions[id].margin + swapped);
-            }
-        }
-
-        console.log("Final");
-
-        openInterest[scalpPositions[id].isShort] -= scalpPositions[id].size;
-        int256 pnl = int256(traderWithdraw) - int256(scalpPositions[id].margin + scalpPositions[id].premium + scalpPositions[id].fees);
-        scalpPositions[id].pnl = pnl;
-        cumulativePnl[owner] += pnl;
-        cumulativeVolume[owner] += scalpPositions[id].size;
-
-        emit ClosePosition(id, pnl, msg.sender);
-    }
-
-
     /// @notice Public function to retrieve price of base asset from oracle
     /// @param price Mark price (quoteDecimals)
     function getMarkPrice() public view returns (uint256 price) {
         price = uint256(priceOracle.getUnderlyingPrice()) / 10 ** 2;
+    }
+
+    /// @notice Returns the owner of a position
+    /// @param id position identifier
+    function positionOwner(uint256 id) public view returns (address) {
+        return IERC721(scalpPositionMinter).ownerOf(id);
     }
 
     /// @notice Returns the tokenIds owned by a wallet

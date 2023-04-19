@@ -164,7 +164,7 @@ describe("Limit orders", function () {
 
     // (1.0001 ** (-204000)) * (10 ** 12) = 1383
 
-    await limitOrders.connect(user1).createOpenOrder(optionScalp.address, true, "5000000000", 0, collateral, tick0, tick1, {gasLimit: 4000000});
+    await limitOrders.connect(user1).createOpenOrder(optionScalp.address, true, "5000000000", 4, collateral, tick0, tick1, {gasLimit: 4000000});
 
     // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
     await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not totally filled');
@@ -222,7 +222,7 @@ describe("Limit orders", function () {
 
     expect(bf5WethBalance).to.eq("1825577554431309211987");
 
-    await uniV3Router.connect(bf5).exactInputSingle({
+    const swapParams = {
       tokenIn: weth.address,
       tokenOut: usdc.address,
       fee: 500,
@@ -231,9 +231,32 @@ describe("Limit orders", function () {
       amountIn: bf5WethBalance,
       amountOutMinimum: 1,
       sqrtPriceLimitX96: 0,
-    });
+    };
+
+    const swapped = await uniV3Router.connect(bf5).callStatic.exactInputSingle(swapParams);
+
+    await uniV3Router.connect(bf5).exactInputSingle(swapParams);
 
     console.log("Uniswap");
+
+    console.log("Swapped " + swapped);
+
+    const price = swapped.mul("100000000000000000000").div(bf5WethBalance);
+
+    await priceOracle.updateUnderlyingPrice(price);
+
+    const isLiquidatable = await optionScalp.isLiquidatable(1);
+    expect(isLiquidatable).to.eq(false);
+
+    // Even if there is a limit order it is still possible to close the position (by user or liquidation)
+
+    console.log(limitOrders.address);
+
+    console.log("Other users tries to call");
+    await expect(optionScalp.connect(user2).callStatic.closePosition(1)).to.be.revertedWith("Keeper can only close after expiry");
+
+    console.log("Owner tries to call");
+    await optionScalp.connect(user1).callStatic.closePosition(1); // Call static no effects
 
     // Bot is triggered
     await limitOrders.connect(user2).fillCloseOrder(1);
