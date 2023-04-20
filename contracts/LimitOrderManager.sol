@@ -67,7 +67,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     event CancelOrder(uint id, address user);
 
-    function addOptionScalps(address[] memory _optionScalps) external {
+    /// @notice Admin function to add an option scalp
+    function addOptionScalps(address[] memory _optionScalps) external onlyOwner {
       for (uint i = 0; i < _optionScalps.length; i++) {
         require(_optionScalps[i] != address(0), "Invalid option scalp address");
         optionScalps[_optionScalps[i]] = true;
@@ -76,6 +77,12 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       }
     }
 
+    /// @notice Internal function to calc. amounts to deposit given a locked liquidity target
+    /// @param lockedLiquidity Amount of target locked liquidity
+    /// @param optionScalp the OptionScalp contract we use
+    /// @param isShort If true the position will be a short
+    /// @param tick0 Start tick of the position to create
+    /// @param tick1 End tick of the position to create
     function calcAmounts(uint256 lockedLiquidity, OptionScalp optionScalp, bool isShort, int24 tick0, int24 tick1) internal returns (address token0, address token1, uint256 amount0, uint256 amount1) {
           address base = address(optionScalp.base());
           address quote = address(optionScalp.quote());
@@ -100,6 +107,12 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           }
     }
 
+    /// @notice Internal function to create a new Uniswap V3 position
+    /// @param _optionScalp Address of option scalp
+    /// @param tick0 Start tick of the position to create
+    /// @param tick1 End tick of the position to create
+    /// @param amount Amount to deposit
+    /// @param isShort If true the position will be a short
     function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 amount, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
           lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * amount / optionScalp.getMarkPrice() : amount;
 
@@ -115,6 +128,14 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           );
     }
 
+    /// @notice Create a new OpenOrder
+    /// @param _optionScalp Address of option scalp
+    /// @param isShort If true the position will be a short
+    /// @param size Size of position (quoteDecimals)
+    /// @param timeframeIndex Position of the array
+    /// @param collateral Total collateral posted by user
+    /// @param tick0 Start tick of the position to create
+    /// @param tick1 End tick of the position to create
     function createOpenOrder(
       address _optionScalp,
       bool isShort,
@@ -171,6 +192,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       orderCount++;
     }
 
+    /// @notice Fill a OpenOrder
+    /// @param _id ID of the OpenOrder
     function fillOpenOrder(uint _id)
     nonReentrant
     external {
@@ -241,6 +264,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
      });
     }
 
+    /// @notice Fill a CloseOrder
+    /// @param _id ID of the CloseOrder
     function fillCloseOrder(uint _id)
     nonReentrant
     external {
@@ -277,7 +302,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       closeOrders[_id].filled = true;
     }
-    
+
+    /// @notice Cancel OpenOrder
+    /// @param _id ID of the OpenOrder
     function cancelOpenOrder(uint _id)
     nonReentrant
     external {
@@ -307,6 +334,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       emit CancelOrder(_id, msg.sender);
     }
 
+    /// @notice Cancel CloseOrder
+    /// @param _id ID of the CloseOrder
     function cancelCloseOrder(uint _id)
     nonReentrant
     external {
@@ -333,6 +362,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       emit CancelOrder(_id, msg.sender);
     }
 
+    /// @notice Returns true is CloseOrder is active
+    /// @param _id ID of the CloseOrder
     function isCloseOrderActive(uint256 _id) public returns (bool) {
         return !closeOrders[_id].filled && closeOrders[_id].optionScalp != address(0);
     }

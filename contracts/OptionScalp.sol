@@ -224,7 +224,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         base.approve(address(baseLp), type(uint256).max);
     }
 
-    function getPosition(uint256 id) public returns (ScalpPosition memory) {
+    /// @notice External function to retrieve a ScalpPosition
+    /// @param id ID of the position
+    function getPosition(uint256 id) external returns (ScalpPosition memory) {
         return scalpPositions[id];
     }
 
