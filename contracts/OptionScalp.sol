@@ -723,7 +723,14 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
                 int256(10 ** quoteDecimals);
     }
 
-    function mintUniswapV3Position(address token0, address token1, int24 tick0, int24 tick1, uint256 amount0, uint256 amount1) public returns (uint256 positionId) {
+    /// @notice Function called by Limit Order manager to trigger Uniswap V3 NFT mint
+    /// @param token0 First token of the pool
+    /// @param token1 Second token of the pool
+    /// @param tick0 Start tick of the position
+    /// @param tick1 End tick of the position
+    /// @param amount0 Amount of token0 deposited
+    /// @param amount1 Amount of token 1 deposited
+    function mintUniswapV3Position(address token0, address token1, int24 tick0, int24 tick1, uint256 amount0, uint256 amount1) external returns (uint256 positionId) {
       require(msg.sender == address(limitOrderManager), "Wrong sender");
 
       uint256 token0StartBalance = IERC20(token0).balanceOf(address(this));
@@ -761,7 +768,11 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
       positionId = nonFungiblePositionManager.tokenOfOwnerByIndex(address(this), nonFungiblePositionManager.balanceOf(address(this)) - 1);
     }
 
-    function burnUniswapV3Position(IUniswapV3Pool pool, uint256 positionId, bool isShort) public returns (uint256 swapped) {
+    /// @notice Function called by Limit Order manager to trigger Uniswap V3 NFT burn
+    /// @param pool Uniswap pool to use
+    /// @param positionId NFT id
+    /// @param isShort if True then order was to open a short position
+    function burnUniswapV3Position(IUniswapV3Pool pool, uint256 positionId, bool isShort) external returns (uint256 swapped) {
         require(msg.sender == address(limitOrderManager), "Wrong sender");
 
         (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
@@ -805,6 +816,11 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         }
     }
 
+    /// @notice Function called by Limit Order manager when a OpenOrder is closed to settle fees
+    /// @param user Creator of the order
+    /// @param isQuote If true fees go to quote lp
+    /// @param amount Collateral to send back to user
+    /// @param fees Fees paid to LPs
     function settleOpenOrderDeletion(address user, bool isQuote, uint256 amount, uint256 fees) external {
         require(msg.sender == address(limitOrderManager));
 
