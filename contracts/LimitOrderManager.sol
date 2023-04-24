@@ -108,7 +108,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     }
 
     /// @notice Internal function to create a new Uniswap V3 position
-    /// @param _optionScalp Address of option scalp
+    /// @param optionScalp Address of option scalp
     /// @param tick0 Start tick of the position to create
     /// @param tick1 End tick of the position to create
     /// @param amount Amount to deposit
@@ -129,7 +129,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     }
 
     /// @notice Create a new OpenOrder
-    /// @param _optionScalp Address of option scalp
+    /// @param optionScalp Address of option scalp
     /// @param isShort If true the position will be a short
     /// @param size Size of position (quoteDecimals)
     /// @param timeframeIndex Position of the array
@@ -137,7 +137,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @param tick0 Start tick of the position to create
     /// @param tick1 End tick of the position to create
     function createOpenOrder(
-      address _optionScalp,
+      OptionScalp optionScalp,
       bool isShort,
       uint256 size,
       uint256 timeframeIndex,
@@ -147,8 +147,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     )
     nonReentrant
     external {
-      require(optionScalps[_optionScalp], "Invalid option scalp contract");
-      OptionScalp optionScalp = OptionScalp(_optionScalp);
+      require(optionScalps[address(optionScalp)], "Invalid option scalp contract");
 
       require(optionScalp.timeframes(timeframeIndex) != 0, "Invalid timeframe");
       require(collateral >= optionScalp.minimumMargin(), "Insufficient margin");
@@ -171,7 +170,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
 
       openOrders[orderCount] = OpenOrder({
-        optionScalp: _optionScalp,
+        optionScalp: address(optionScalp),
         user: msg.sender,
         isShort: isShort,
         filled: false,
@@ -234,17 +233,21 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       console.log("NFT has been transferred");
     }
-    
+
+    /// @notice Create a CloseOrder
+    /// @param optionScalp Address of option scalp
+    /// @param id Order id
+    /// @param tick0 Start tick of the position to create
+    /// @param tick1 End tick of the position to create
     function createCloseOrder(
-        address _optionScalp,
+        OptionScalp optionScalp,
         uint256 id,
         int24 tick0,
         int24 tick1
     )
     nonReentrant
     external {
-      require(optionScalps[_optionScalp], "Invalid option scalp contract");
-      OptionScalp optionScalp = OptionScalp(_optionScalp);
+      require(optionScalps[address(optionScalp)], "Invalid option scalp contract");
         
       OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(id);
       require(closeOrders[id].optionScalp == address(0), "There is already an open order for this position");
@@ -258,7 +261,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       );
 
      closeOrders[id] = CloseOrder({
-        optionScalp: _optionScalp,
+        optionScalp: address(optionScalp),
         filled: false,
         positionId: positionId
      });
