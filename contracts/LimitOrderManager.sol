@@ -26,6 +26,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     uint256 MAX = 2**256 - 1;
 
+    int24 maxTickSpaceMultiplier = 100;
+
     uint256 public maxFundingTime = 4 hours;
 
     uint256 public fundingRate = 1825000000; // 18.25% annualized (0.002% per hour)
@@ -91,6 +93,10 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           token1 = pool.token1();
 
           int24 tickSpacing = pool.tickSpacing();
+          (,int24 tick,,,,,) = pool.slot0();
+
+          if (tick > tick0) require(tick - tick0 <= tickSpacing * maxTickSpaceMultiplier, "Price is too far");
+          else require(tick0 - tick <= tickSpacing * maxTickSpaceMultiplier, "Price is too far");
 
           require(tick1 - tick0 == tickSpacing, "Invalid ticks");
 
