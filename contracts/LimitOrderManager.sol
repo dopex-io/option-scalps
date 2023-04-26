@@ -376,4 +376,14 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     function isCloseOrderActive(uint256 _id) public returns (bool) {
         return !closeOrders[_id].filled && closeOrders[_id].optionScalp != address(0);
     }
+
+    /// @notice Owner-only function to update config
+    /// @param _maxTickSpaceMultiplier Configuration field which indicates how far limit orders prices can be compared to mark price
+    /// @param _maxFundingTime Maximum duration of a OpenOrder
+    /// @param _fundingRate funding apr paid by OpenOrder creator
+    function updateConfig(int24 _maxTickSpaceMultiplier, uint256 _maxFundingTime, uint256 _fundingRate) public onlyOwner {
+        maxTickSpaceMultiplier = _maxTickSpaceMultiplier;
+        maxFundingTime = _maxFundingTime;
+        fundingRate = _fundingRate;
+    }
 }
