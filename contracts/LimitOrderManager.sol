@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 import {IERC20} from "./interface/IERC20.sol";
 import {IUniswapV3Factory} from "./interface/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
+import {INonfungiblePositionManager} from "./interface/INonfungiblePositionManager.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
 import {ContractWhitelist} from "./helpers/ContractWhitelist.sol";
 
@@ -20,6 +21,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "./helpers/Pausable.sol";
 
 import "hardhat/console.sol";
+import "./interface/IOptionScalp.sol";
 
 contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
@@ -375,6 +377,12 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @param _id ID of the CloseOrder
     function isCloseOrderActive(uint256 _id) public returns (bool) {
         return !closeOrders[_id].filled && closeOrders[_id].optionScalp != address(0);
+    }
+
+    /// @notice Returns ticks of a valid nft position
+    /// @param positionId ID of the NFT
+    function getNFTPositionTicks(uint256 positionId, IOptionScalp optionScalp) public returns (int24 tickLower, int24 tickUpper) {
+        (,,,,,tickLower, tickUpper,,,,,) = INonfungiblePositionManager(optionScalp.nonFungiblePositionManager()).positions(positionId);
     }
 
     /// @notice Owner-only function to update config

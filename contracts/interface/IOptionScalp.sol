@@ -35,4 +35,6 @@ interface IOptionScalp {
         // How long position is to be kept open
         uint256 timeframe;
     }
+
+    function nonFungiblePositionManager() external returns(address);
 }

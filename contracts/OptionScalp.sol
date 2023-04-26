@@ -55,7 +55,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     IUniswapV3Router public uniswapV3Router;
 
     // NonfungiblePositionManager
-    INonfungiblePositionManager nonFungiblePositionManager = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
+    INonfungiblePositionManager public nonFungiblePositionManager;
 
     uint256[] public timeframes = [
         1 minutes,
@@ -181,6 +181,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         uint256 _quoteDecimals,
         address _uniswapV3Router,
         address _limitOrdersManager,
+        address _nonFungiblePositionManager,
         Configuration memory config
     ) {
         require(_base != address(0), "Invalid base token");
@@ -192,6 +193,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         quoteDecimals = _quoteDecimals;
         uniswapV3Router = IUniswapV3Router(_uniswapV3Router);
         limitOrderManager = LimitOrderManager(_limitOrdersManager);
+        nonFungiblePositionManager = INonfungiblePositionManager(_nonFungiblePositionManager);
 
         maxSize = config.maxSize;
         maxOpenInterest = config.maxOpenInterest;

@@ -79,6 +79,7 @@ describe("Option scalp", function() {
       6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       limitOrders.address,
+      "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", // UNI V3 NFT Manager
       [
           "100000000000",  // $100.000
           "10000000000000",  // $10M
@@ -219,6 +220,7 @@ describe("Option scalp", function() {
       18,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
       limitOrders.address,
+      "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", // UNI V3 NFT Manager
       [
           "10000000000000000000",  // 10 ETH
           "1000000000000000000000",  // 1000 ETH
