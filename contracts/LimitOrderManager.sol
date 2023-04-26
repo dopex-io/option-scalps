@@ -47,6 +47,18 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     uint public orderCount;
 
+    // Create open order event
+    event CreateOpenOrder(uint256 id, address indexed user);
+
+    // Cancel open order event
+    event CancelOpenOrder(uint256 id, address indexed user);
+
+    // Create close order event
+    event CreateCloseOrder(uint256 id, address indexed user);
+
+    // Cancel close order event
+    event CancelCloseOrder(uint256 id, address indexed user);
+
     struct OpenOrder {
       address optionScalp;
       address user;
@@ -66,10 +78,6 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       bool filled;
       uint256 positionId;
     }
-
-    event NewOrder(uint id, address user);
-
-    event CancelOrder(uint id, address user);
 
     /// @notice Admin function to add an option scalp
     function addOptionScalps(address[] memory _optionScalps) external onlyOwner {
@@ -191,7 +199,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         timestamp: block.timestamp
       });
 
-      emit NewOrder(
+      emit CreateOpenOrder(
         orderCount,
         msg.sender
       );
@@ -258,6 +266,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       require(optionScalps[address(optionScalp)], "Invalid option scalp contract");
         
       OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(id);
+      address owner = optionScalp.positionOwner(id);
+      require(msg.sender == owner, "Sender not authorized");
       require(closeOrders[id].optionScalp == address(0), "There is already an open order for this position");
 
       (uint256 positionId, uint256 lockedLiquidity) = createPosition(
@@ -273,6 +283,11 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         filled: false,
         positionId: positionId
      });
+
+     emit CreateCloseOrder(
+        id,
+        owner
+     );
     }
 
     /// @notice Fill a CloseOrder
@@ -342,7 +357,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       optionScalp.settleOpenOrderDeletion(openOrders[_id].user, openOrders[_id].isShort, openOrders[_id].collateral - fees, fees);
 
-      emit CancelOrder(_id, msg.sender);
+      emit CancelOpenOrder(_id, msg.sender);
     }
 
     /// @notice Cancel CloseOrder
@@ -370,7 +385,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       delete closeOrders[_id];
 
-      emit CancelOrder(_id, msg.sender);
+      emit CancelCloseOrder(_id, msg.sender);
     }
 
     /// @notice Returns true is CloseOrder is active
