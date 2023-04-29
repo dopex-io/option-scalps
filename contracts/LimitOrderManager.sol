@@ -95,7 +95,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @param isShort If true the position will be a short
     /// @param tick0 Start tick of the position to create
     /// @param tick1 End tick of the position to create
-    function calcAmounts(uint256 lockedLiquidity, OptionScalp optionScalp, bool isShort, int24 tick0, int24 tick1) internal returns (address token0, address token1, uint256 amount0, uint256 amount1) {
+    function calcAmounts(uint256 lockedLiquidity, OptionScalp optionScalp, bool isShort, int24 tick0, int24 tick1) internal view returns (address token0, address token1, uint256 amount0, uint256 amount1) {
           address base = address(optionScalp.base());
           address quote = address(optionScalp.quote());
           IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
@@ -270,7 +270,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       require(msg.sender == owner, "Sender not authorized");
       require(closeOrders[id].optionScalp == address(0), "There is already an open order for this position");
 
-      (uint256 positionId, uint256 lockedLiquidity) = createPosition(
+      (uint256 positionId,) = createPosition(
         optionScalp,
         tick0,
         tick1,
@@ -377,7 +377,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
 
-      uint256 swapped = optionScalp.burnUniswapV3Position(
+      optionScalp.burnUniswapV3Position(
           pool,
           closeOrders[_id].positionId,
           !scalpPosition.isShort
@@ -390,7 +390,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     /// @notice Returns true is CloseOrder is active
     /// @param _id ID of the CloseOrder
-    function isCloseOrderActive(uint256 _id) public returns (bool) {
+    function isCloseOrderActive(uint256 _id) public view returns (bool) {
         return !closeOrders[_id].filled && closeOrders[_id].optionScalp != address(0);
     }
 

@@ -228,7 +228,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
     /// @notice External function to retrieve a ScalpPosition
     /// @param id ID of the position
-    function getPosition(uint256 id) external returns (ScalpPosition memory) {
+    function getPosition(uint256 id) external view returns (ScalpPosition memory) {
         return scalpPositions[id];
     }
 
@@ -783,7 +783,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
 
         address token0 = pool.token0();
-        address token1 = pool.token1();
 
         console.log("Collecting");
 
