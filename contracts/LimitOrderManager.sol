@@ -129,10 +129,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @param tick1 End tick of the position to create
     /// @param amount Amount to deposit
     /// @param isShort If true the position will be a short
-    function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 amount, bool isShort) internal returns (uint256 positionId, uint256 lockedLiquidity) {
-          lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * amount / optionScalp.getMarkPrice() : amount;
-
-          (address token0, address token1, uint256 amount0, uint256 amount1) = calcAmounts(lockedLiquidity, optionScalp, isShort, tick0, tick1);
+    function createPosition(OptionScalp optionScalp, int24 tick0, int24 tick1, uint256 amount, bool isShort) internal returns (uint256 positionId) {
+          (address token0, address token1, uint256 amount0, uint256 amount1) = calcAmounts(amount, optionScalp, isShort, tick0, tick1);
 
           positionId = optionScalp.mintUniswapV3Position(
               token0,
@@ -175,11 +173,13 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           collateral
       );
 
-      (uint256 positionId, uint256 lockedLiquidity) = createPosition(
+      uint256 lockedLiquidity = isShort ? (10 ** optionScalp.baseDecimals()) * size / optionScalp.getMarkPrice() : size;
+
+      (uint256 positionId) = createPosition(
         optionScalp,
         tick0,
         tick1,
-        size,
+        lockedLiquidity,
         isShort
       );
 
@@ -270,7 +270,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       require(msg.sender == owner, "Sender not authorized");
       require(closeOrders[id].optionScalp == address(0), "There is already an open order for this position");
 
-      (uint256 positionId,) = createPosition(
+      (uint256 positionId) = createPosition(
         optionScalp,
         tick0,
         tick1,
