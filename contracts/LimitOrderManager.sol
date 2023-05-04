@@ -396,7 +396,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     /// @notice Returns ticks of a valid nft position
     /// @param positionId ID of the NFT
-    function getNFTPositionTicks(uint256 positionId, IOptionScalp optionScalp) public returns (int24 tickLower, int24 tickUpper) {
+    function getNFTPositionTicks(uint256 positionId, IOptionScalp optionScalp) public view returns (int24 tickLower, int24 tickUpper) {
         (,,,,,tickLower, tickUpper,,,,,) = INonfungiblePositionManager(optionScalp.nonFungiblePositionManager()).positions(positionId);
     }
 
