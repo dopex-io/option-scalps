@@ -500,7 +500,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         _isEligibleSender();
         require(scalpPositions[id].isOpen, "Invalid position ID");
 
-        // Cancel close order if exists
+        // Cancel close order if exists or close it through existing close order if already filled
         if (limitOrderManager.isCloseOrderActive(id)) {
             try limitOrderManager.cancelCloseOrder(id) {}
             catch {
