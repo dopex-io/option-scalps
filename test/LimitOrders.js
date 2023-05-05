@@ -257,21 +257,16 @@ describe("Limit orders", function () {
 
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
-    console.log(limitOrders.address);
+    // Bot can close using fillCloseOrder
+    await limitOrders.connect(user2).callStatic.fillCloseOrder(1);
 
-    console.log("Other users tries to call close but order has been already filled");
-    await expect(optionScalp.connect(user2).callStatic.closePosition(1)).to.be.revertedWith("Not filled as expected");
-
-    console.log("Owner tries to call close but order has been already filled");
-    await expect(optionScalp.connect(user1).callStatic.closePosition(1)).to.be.revertedWith("Not filled as expected");
-
-    // Bot is triggered
-    await limitOrders.connect(user2).fillCloseOrder(1);
+    // Kepper can also just call closePosition()
+    await optionScalp.connect(user2).closePosition(1);
 
     const isActive = await limitOrders.isCloseOrderActive(1);
     expect(isActive).to.eq(false);
 
-     console.log("Other users tries to call close but it has been already closed");
+    console.log("Other users tries to call close but it has been already closed");
     await expect(optionScalp.connect(user2).callStatic.closePosition(1)).to.be.revertedWith("Invalid position ID");
 
     console.log("Owner tries to call close");

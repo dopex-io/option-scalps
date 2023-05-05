@@ -285,7 +285,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @param _id ID of the CloseOrder
     function fillCloseOrder(uint _id)
     nonReentrant
-    external {
+    external returns (bool) {
       require(
         isCloseOrderActive(_id),
         "Order is not active and unfilled"
@@ -309,6 +309,8 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       );
 
       closeOrders[_id].filled = true;
+
+      return true;
     }
 
     /// @notice Cancel OpenOrder

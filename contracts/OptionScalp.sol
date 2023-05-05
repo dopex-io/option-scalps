@@ -496,13 +496,16 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
     /// @notice Closes an open position
     /// @param id ID of position
-    function closePosition(uint256 id) public {
+    function closePosition(uint256 id) public returns (bool) {
         _isEligibleSender();
         require(scalpPositions[id].isOpen, "Invalid position ID");
 
         // Cancel close order if exists
         if (limitOrderManager.isCloseOrderActive(id)) {
-            limitOrderManager.cancelCloseOrder(id);
+            try limitOrderManager.cancelCloseOrder(id) {}
+            catch {
+                return limitOrderManager.fillCloseOrder(id);
+            }
         }
 
         if (!isLiquidatable(id) && msg.sender != IERC721(scalpPositionMinter).ownerOf(id))
@@ -531,6 +534,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         }
 
         settlePosition(id, swapped);
+
+        return true;
     }
 
     /// @notice Closes an open position from a limit order
