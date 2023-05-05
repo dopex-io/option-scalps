@@ -168,7 +168,7 @@ describe("Limit orders", function () {
     await limitOrders.connect(user1).createOpenOrder(optionScalp.address, true, "5000000000", 4, collateral, tick0, tick1, {gasLimit: 4000000});
 
     // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
-    await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not totally filled');
+    await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not filled as expected');
 
     // Callstatic try cancel order
     await limitOrders.connect(user1).callStatic.cancelOpenOrder(0);
@@ -218,7 +218,10 @@ describe("Limit orders", function () {
     await limitOrders.connect(user1).createCloseOrder(optionScalp.address, 1, tick0, tick1);
 
     // Bot tries to close the position but price hasn't moved and Uniswap NFT order hasn't been filled
-    await expect(limitOrders.connect(user2).fillCloseOrder(1)).to.be.revertedWith('Not totally filled');
+    await expect(limitOrders.connect(user2).fillCloseOrder(1)).to.be.revertedWith('Not filled as expected');
+
+    // Bot tries to cancel the order
+    await limitOrders.connect(user1).callStatic.cancelCloseOrder(1);
 
     // Price goes down
     const bf5WethBalance = await weth.balanceOf(bf5Address);
@@ -256,13 +259,22 @@ describe("Limit orders", function () {
 
     console.log(limitOrders.address);
 
-    console.log("Other users tries to call");
-    await expect(optionScalp.connect(user2).callStatic.closePosition(1)).to.be.revertedWith("Keeper can only close after expiry");
+    console.log("Other users tries to call close but order has been already filled");
+    await expect(optionScalp.connect(user2).callStatic.closePosition(1)).to.be.revertedWith("Not filled as expected");
 
-    console.log("Owner tries to call");
-    await optionScalp.connect(user1).callStatic.closePosition(1); // Call static no effects
+    console.log("Owner tries to call close but order has been already filled");
+    await expect(optionScalp.connect(user1).callStatic.closePosition(1)).to.be.revertedWith("Not filled as expected");
 
     // Bot is triggered
     await limitOrders.connect(user2).fillCloseOrder(1);
+
+    const isActive = await limitOrders.isCloseOrderActive(1);
+    expect(isActive).to.eq(false);
+
+     console.log("Other users tries to call close but it has been already closed");
+    await expect(optionScalp.connect(user2).callStatic.closePosition(1)).to.be.revertedWith("Invalid position ID");
+
+    console.log("Owner tries to call close");
+    await expect(optionScalp.connect(user1).callStatic.closePosition(1)).to.be.revertedWith("Invalid position ID");
   });
 });

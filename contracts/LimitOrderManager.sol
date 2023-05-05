@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 import {IERC20} from "./interface/IERC20.sol";
 import {IUniswapV3Factory} from "./interface/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
+import {IOptionScalp} from "./interface/IOptionScalp.sol";
 import {INonfungiblePositionManager} from "./interface/INonfungiblePositionManager.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
 import {ContractWhitelist} from "./helpers/ContractWhitelist.sol";
@@ -20,8 +21,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Pausable} from "./helpers/Pausable.sol";
 
-import "hardhat/console.sol";
-import "./interface/IOptionScalp.sol";
 
 contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
@@ -222,15 +221,11 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
 
-      console.log("Burn Uniswap V3 Position");
-
       uint256 swapped = optionScalp.burnUniswapV3Position(
           pool,
           openOrders[_id].positionId,
           openOrders[_id].isShort
       );
-
-      console.log("Open position from limit order");
 
       uint256 id = optionScalp.openPositionFromLimitOrder(
           swapped,
@@ -241,13 +236,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           openOrders[_id].lockedLiquidity
       );
 
-      console.log("Opened!");
-
       openOrders[_id].filled = true;
 
       ScalpPositionMinter(optionScalp.scalpPositionMinter()).transferFrom(address(this), openOrders[_id].user, id);
-
-      console.log("NFT has been transferred");
     }
 
     /// @notice Create a CloseOrder
@@ -296,17 +287,15 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     nonReentrant
     external {
       require(
-        !closeOrders[_id].filled &&
-        closeOrders[_id].optionScalp != address(0),
+        isCloseOrderActive(_id),
         "Order is not active and unfilled"
       );
+
       OptionScalp optionScalp = OptionScalp(closeOrders[_id].optionScalp);
 
       OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(_id);
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
-
-      console.log("Burn Uniswap V3 Position");
 
       uint256 swapped = optionScalp.burnUniswapV3Position(
           pool,
@@ -314,17 +303,10 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           !scalpPosition.isShort
       );
 
-      console.log("Close position from limit order");
-
-      console.log("Swapped");
-      console.log(swapped);
-
       optionScalp.closePositionFromLimitOrder(
           _id,
           swapped
       );
-
-      console.log("Closed!");
 
       closeOrders[_id].filled = true;
     }
@@ -380,7 +362,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       optionScalp.burnUniswapV3Position(
           pool,
           closeOrders[_id].positionId,
-          !scalpPosition.isShort
+          scalpPosition.isShort
       );
 
       delete closeOrders[_id];
@@ -391,12 +373,14 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @notice Returns true is CloseOrder is active
     /// @param _id ID of the CloseOrder
     function isCloseOrderActive(uint256 _id) public view returns (bool) {
-        return !closeOrders[_id].filled && closeOrders[_id].optionScalp != address(0);
+        return
+        !closeOrders[_id].filled &&
+        closeOrders[_id].optionScalp != address(0);
     }
 
     /// @notice Returns ticks of a valid nft position
     /// @param positionId ID of the NFT
-    function getNFTPositionTicks(uint256 positionId, IOptionScalp optionScalp) public view returns (int24 tickLower, int24 tickUpper) {
+    function getNFTPositionTicks(uint256 positionId, IOptionScalp optionScalp) public returns (int24 tickLower, int24 tickUpper) {
         (,,,,,tickLower, tickUpper,,,,,) = INonfungiblePositionManager(optionScalp.nonFungiblePositionManager()).positions(positionId);
     }
 

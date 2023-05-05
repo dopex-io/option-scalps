@@ -24,7 +24,8 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
 
-import "hardhat/console.sol";
+import 'hardhat/console.sol';
+
 
 contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
@@ -459,9 +460,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
       uint256 entry = ((10 ** baseDecimals) * size) / swapped;
 
-      console.log("Entry");
-      console.log(entry);
-
       uint256 markPrice = getMarkPrice();
 
       // Calculate premium for ATM option in quote
@@ -470,15 +468,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
           size,
           timeframes[timeframeIndex]
       );
-
-      console.log("Premium");
-      console.log(premium);
-
       // Calculate opening fees in quote
       uint256 openingFees = calcFees(size);
-
-      console.log("Opening fees");
-      console.log(openingFees);
 
       require(collateral > premium + openingFees, "Insufficient margin");
 
@@ -500,8 +491,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             timeframe: timeframes[timeframeIndex]
       });
 
-      console.log("Done!");
-
       emit OpenPosition(id, size, msg.sender);
     }
 
@@ -509,17 +498,12 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     /// @param id ID of position
     function closePosition(uint256 id) public {
         _isEligibleSender();
+        require(scalpPositions[id].isOpen, "Invalid position ID");
 
         // Cancel close order if exists
-        console.log(address(limitOrderManager));
-        console.log(limitOrderManager.isCloseOrderActive(id));
-        if (limitOrderManager.isCloseOrderActive(id)) limitOrderManager.cancelCloseOrder(id);
-
-        console.log("IS LIQUIDATABLE");
-        console.log(isLiquidatable(id));
-
-        console.log("IS EXPIRED");
-        console.log(block.timestamp >= scalpPositions[id].openedAt + scalpPositions[id].timeframe);
+        if (limitOrderManager.isCloseOrderActive(id)) {
+            limitOrderManager.cancelCloseOrder(id);
+        }
 
         if (!isLiquidatable(id) && msg.sender != IERC721(scalpPositionMinter).ownerOf(id))
             require(
@@ -554,6 +538,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     /// @param swapped Amount obtained from the swap
     function closePositionFromLimitOrder(uint256 id, uint256 swapped) public {
         require(msg.sender == address(limitOrderManager));
+        require(scalpPositions[id].isOpen, "Invalid position ID");
         require(swapped > 0, "Order not filled");
 
         settlePosition(id, swapped);
@@ -563,7 +548,6 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     /// @param id ID of position
     /// @param swapped Amount obtained from the swap
     function settlePosition(uint256 id, uint256 swapped) internal {
-        require(scalpPositions[id].isOpen, "Invalid position ID");
         require(
             scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
             "Position must be open for at least 1 second"
@@ -740,31 +724,12 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
       uint256 token0StartBalance = IERC20(token0).balanceOf(address(this));
       uint256 token1StartBalance = IERC20(token1).balanceOf(address(this));
 
-      console.log("Token 0 start balance");
-      console.log(token0StartBalance);
-      console.log("Token 1 start balance");
-      console.log(token1StartBalance);
-
-      console.log("Amount 0");
-      console.log(amount0);
-      console.log("Amount 1");
-      console.log(amount1);
-
       nonFungiblePositionManager.mint(INonfungiblePositionManager.MintParams(
         token0, token1, 500, tick0, tick1, amount0, amount1, 0, 0, address(this), block.timestamp
       ));
 
       uint256 token0EndBalance = IERC20(token0).balanceOf(address(this));
       uint256 token1EndBalance = IERC20(token1).balanceOf(address(this));
-
-      console.log("Token 0 end balance");
-      console.log(token0EndBalance);
-      console.log("Token 1 end balance");
-      console.log(token1EndBalance);
-
-      console.log("Difference");
-      console.log(token0StartBalance - token0EndBalance);
-      console.log(token1StartBalance - token1EndBalance);
 
       require(token0StartBalance - token0EndBalance >= amount0 * 999999 / 1000000, "Invalid ticks");
       require(token1StartBalance - token1EndBalance >= amount1 * 999999 / 1000000, "Invalid ticks");
@@ -783,38 +748,29 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
 
         address token0 = pool.token0();
-
-        console.log("Collecting");
-
         nonFungiblePositionManager.collect(INonfungiblePositionManager.CollectParams(positionId, address(this), uint128(amount0), uint128(amount1)));
-
-        console.log("Withdrawing");
-        console.log(amount0);
-        console.log(amount1);
-        console.log("Is short?");
-        console.log(isShort);
 
         if (address(base) == token0) {
           // amount0 is base
           // amount1 is quote
           if (isShort) {
               swapped = amount1;
-              require(amount0 == 0, "Not totally filled");
+              require(amount0 == 0, "Not filled as expected");
           }
           else {
               swapped = amount0;
-              require(amount1 == 0, "Not totally filled");
+              require(amount1 == 0, "Not filled as expected");
           }
         }  else {
           // amount0 is quote
           // amount1 is base
           if (isShort) {
               swapped = amount0;
-              require(amount1 == 0, "Not totally filled");
+              require(amount1 == 0, "Not filled as expected");
           }
           else {
               swapped = amount1;
-              require(amount0 == 0, "Not totally filled");
+              require(amount0 == 0, "Not filled as expected");
           }
         }
     }
