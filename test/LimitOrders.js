@@ -255,6 +255,12 @@ describe("Limit orders", function () {
     const isLiquidatable = await optionScalp.isLiquidatable(1);
     expect(isLiquidatable).to.eq(false);
 
+    // Try emergency withdraw nft
+    const closeOrder = await limitOrders.callStatic.closeOrders(1);
+    const positionId = closeOrder['positionId'];
+
+    await optionScalp.callStatic.emergencyWithdrawNFTs([positionId]);
+
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
     // Bot can close using fillCloseOrder
