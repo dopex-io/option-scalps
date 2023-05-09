@@ -52,4 +52,8 @@ interface INonfungiblePositionManager {
         uint128 tokensOwed0,
         uint128 tokensOwed1
     );
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) external;
+
+    function burn(uint256 tokenId) external payable;
 }

@@ -749,11 +749,12 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     function burnUniswapV3Position(IUniswapV3Pool pool, uint256 positionId, bool isShort) external returns (uint256 swapped) {
         require(msg.sender == address(limitOrderManager), "Wrong sender");
 
+        address token0 = pool.token0();
+
         (,,,,,,,uint128 liquidity,,,,) = nonFungiblePositionManager.positions(positionId);
         (uint256 amount0, uint256 amount1) = nonFungiblePositionManager.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams(positionId, liquidity, 0, 0, block.timestamp));
 
-        address token0 = pool.token0();
-        nonFungiblePositionManager.collect(INonfungiblePositionManager.CollectParams(positionId, address(this), uint128(amount0), uint128(amount1)));
+        nonFungiblePositionManager.collect(INonfungiblePositionManager.CollectParams(positionId, address(this), type(uint128).max, type(uint128).max));
 
         if (address(base) == token0) {
           // amount0 is base
@@ -778,6 +779,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
               require(amount0 == 0, "Not filled as expected");
           }
         }
+
+        nonFungiblePositionManager.burn(positionId);
     }
 
     /// @notice Function called by Limit Order manager when a OpenOrder is closed to settle fees
@@ -865,6 +868,25 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         for (uint256 i; i < tokens.length; ) {
             token = IERC20(tokens[i]);
             token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        emit EmergencyWithdraw(msg.sender);
+    }
+
+    /// @notice Transfers NFTs to msg.sender
+    /// @dev Can only be called by the owner
+    /// @param tokens The list of erc721 tokens to withdraw
+    function emergencyWithdrawNFTs(
+        uint256[] calldata tokens
+    ) external onlyOwner {
+        IERC721 token;
+
+        for (uint256 i; i < tokens.length; ) {
+            nonFungiblePositionManager.safeTransferFrom(address(this), msg.sender, tokens[i]);
 
             unchecked {
                 ++i;
