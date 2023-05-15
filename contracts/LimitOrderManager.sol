@@ -58,6 +58,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     // Cancel close order event
     event CancelCloseOrder(uint256 id, address indexed user);
 
+    // Emergency withdraw
+    event EmergencyWithdraw(address indexed receiver);
+
     struct OpenOrder {
       address optionScalp;
       address user;
@@ -394,5 +397,29 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         maxTickSpaceMultiplier = _maxTickSpaceMultiplier;
         maxFundingTime = _maxFundingTime;
         fundingRate = _fundingRate;
+    }
+
+    /// @notice Transfers all funds to msg.sender
+    /// @dev Can only be called by the owner
+    /// @param tokens The list of erc20 tokens to withdraw
+    /// @param transferNative Whether should transfer the native currency
+    function emergencyWithdraw(
+        address[] calldata tokens,
+        bool transferNative
+    ) external onlyOwner {
+        if (transferNative) payable(msg.sender).transfer(address(this).balance);
+
+        IERC20 token;
+
+        for (uint256 i; i < tokens.length; ) {
+            token = IERC20(tokens[i]);
+            token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        emit EmergencyWithdraw(msg.sender);
     }
 }
