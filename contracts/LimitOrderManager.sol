@@ -168,7 +168,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       (optionScalp.quote()).safeTransferFrom(
           msg.sender,
-          address(this),
+          address(optionScalp),
           collateral
       );
 
