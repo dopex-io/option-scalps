@@ -24,8 +24,6 @@ import {IPriceOracle} from "./interface/IPriceOracle.sol";
 import {IUniswapV3Router} from "./interface/IUniswapV3Router.sol";
 import {IUniswapV3Pool} from "./interface/IUniswapV3Pool.sol";
 
-import 'hardhat/console.sol';
-
 
 contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
@@ -371,9 +369,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             // base to quote
             swapped = _swapExactOut(address(base), address(quote), size);
 
-            // size is quoteDecimals, swapped is quoteDecimals
-            // quoteDecimals * quoteDecimals / (quoteDecimals) = quoteDecimals
-            entry = ((10 ** quoteDecimals) * size) / swapped;
+            // size is quoteDecimals, swapped is baseDecimals
+            // baseDecimals * quoteDecimals / (baseDecimals) = quoteDecimals
+            entry = ((10 ** baseDecimals) * size) / swapped;
 
             require(entry >= entryLimit, "Slippage");
 
