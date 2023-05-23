@@ -447,12 +447,13 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
     /// @notice Opens a position against/in favour of the base asset using limit orders
     /// @param swapped Amount obtained destroying the position nft
+    /// @param user Creator of the order
     /// @param isShort If true position is short
     /// @param collateral Collateral posted by user
     /// @param size Size of position (quoteDecimals)
     /// @param timeframeIndex Position of the array
     /// @param lockedLiquidity Liquidity locked into the position nft
-    function openPositionFromLimitOrder(uint256 swapped, bool isShort, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
+    function openPositionFromLimitOrder(uint256 swapped, address user, bool isShort, uint256 collateral, uint256 size, uint256 timeframeIndex, uint256 lockedLiquidity) public returns (uint256 id) {
       require(msg.sender == address(limitOrderManager));
       require(swapped > 0, "Order not filled");
 
@@ -491,7 +492,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             timeframe: timeframes[timeframeIndex]
       });
 
-      emit OpenPosition(id, size, msg.sender);
+      emit OpenPosition(id, size, user);
     }
 
     /// @notice Closes an open position

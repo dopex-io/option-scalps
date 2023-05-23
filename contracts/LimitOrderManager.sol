@@ -232,6 +232,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       uint256 id = optionScalp.openPositionFromLimitOrder(
           swapped,
+          openOrders[_id].user,
           openOrders[_id].isShort,
           openOrders[_id].collateral,
           openOrders[_id].size,
