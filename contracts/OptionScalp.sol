@@ -371,9 +371,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             // base to quote
             swapped = _swapExactOut(address(base), address(quote), size);
 
-            // size is quoteDecimals, swapped is baseDecimals
-            // baseDecimals * quoteDecimals / (baseDecimals) = quoteDecimals
-            entry = ((10 ** baseDecimals) * size) / swapped;
+            // size is quoteDecimals, swapped is quoteDecimals
+            // quoteDecimals * quoteDecimals / (quoteDecimals) = quoteDecimals
+            entry = ((10 ** quoteDecimals) * size) / swapped;
 
             require(entry >= entryLimit, "Slippage");
 
@@ -459,7 +459,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
       openInterest[isShort] += size;
 
-      uint256 entry = ((10 ** baseDecimals) * size) / swapped;
+      uint256 entry = isShort ? ((10 ** quoteDecimals) * size) / swapped : ((10 ** baseDecimals) * size) / swapped;
 
       uint256 markPrice = getMarkPrice();
 
