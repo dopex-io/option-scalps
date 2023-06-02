@@ -457,7 +457,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
       openInterest[isShort] += size;
 
-      uint256 entry = isShort ? ((10 ** quoteDecimals) * size) / swapped : ((10 ** baseDecimals) * size) / swapped;
+      // if short swapped is ieQuoteDecimals, lockedLiquidity is ieBaseDecimals
+      // if long swapped is ieBaseDecimals, lockedLiquidity is ieQuoteDecimals
+      uint256 entry = isShort ? ((10 ** baseDecimals) * swapped) / lockedLiquidity : ((10 ** baseDecimals) * lockedLiquidity) / swapped;
 
       uint256 markPrice = getMarkPrice();
 

@@ -200,10 +200,13 @@ describe("Limit orders", function () {
     expect(position['isShort']).to.eq(true);
     expect(position['size']).to.eq('5000000000');
     expect(position['amountBorrowed']).to.eq('5000000000000000000');
-    expect(position['entry']).to.eq('722682');
+    expect(position['entry']).to.eq('1383734140'); // 1383
     expect(position['margin']).to.eq('2972500000');
     expect(position['premium']).to.eq('25000000');
     expect(position['amountOut']).to.eq('6918670704');
+
+    const isLiquidatable = await optionScalp.isLiquidatable(1);
+    expect(isLiquidatable).to.eq(false);
   });
 
   it("user 1 closes the short scalp position using a limit order", async function () {
@@ -253,7 +256,7 @@ describe("Limit orders", function () {
     await priceOracle.updateUnderlyingPrice(price);
 
     const isLiquidatable = await optionScalp.isLiquidatable(1);
-    expect(isLiquidatable).to.eq(true);
+    expect(isLiquidatable).to.eq(false);
 
     // Try emergency withdraw nft
     const closeOrder = await limitOrders.callStatic.closeOrders(1);
