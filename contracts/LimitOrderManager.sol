@@ -40,7 +40,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     mapping (uint => OpenOrder) public openOrders; // identifier -> openOrder
 
-    mapping (uint => CloseOrder) public closeOrders; // scalpnftPositionId -> closeOrder
+    mapping (uint => CloseOrder) public closeOrders; // position id -> closeOrder
 
     IUniswapV3Factory uniswapV3Factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
