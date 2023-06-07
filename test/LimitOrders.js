@@ -88,7 +88,7 @@ describe("Limit orders", function () {
       ]
     );
 
-    await limitOrders.addOptionScalps([optionScalp.address]);
+    await limitOrders.attachOptionScalp(optionScalp.address);
 
     // Base LP
     baseLp = (await ethers.getContractFactory("ScalpLP")).attach(await optionScalp.baseLp());
@@ -165,7 +165,7 @@ describe("Limit orders", function () {
 
     // (1.0001 ** (-204000)) * (10 ** 12) = 1383
 
-    await limitOrders.connect(user1).createOpenOrder(optionScalp.address, true, "5000000000", 4, collateral, tick0, tick1, {gasLimit: 4000000});
+    await limitOrders.connect(user1).createOpenOrder(true, "5000000000", 4, collateral, tick0, tick1, {gasLimit: 4000000});
 
     // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
     await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not filled as expected');
@@ -190,6 +190,13 @@ describe("Limit orders", function () {
     });
 
     console.log("Uniswap");
+
+    // Is expired?
+    const isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
+    expect(isOpenOrderFullFillable).to.eq(true);
+
+    const isOpenOrderExpired = await limitOrders.isOpenOrderExpired(0);
+    expect(isOpenOrderExpired).to.eq(false);
 
     // Bot is triggered
     await limitOrders.connect(user2).fillOpenOrder(0);
@@ -218,7 +225,7 @@ describe("Limit orders", function () {
     // (1.0001 ** (-204100)) * (10 ** 12) = 1369
 
     // Create an order to close the position
-    await limitOrders.connect(user1).createCloseOrder(optionScalp.address, 1, tick0, tick1);
+    await limitOrders.connect(user1).createCloseOrder(1, tick0, tick1);
 
     // Bot tries to close the position but price hasn't moved and Uniswap NFT order hasn't been filled
     await expect(limitOrders.connect(user2).fillCloseOrder(1)).to.be.revertedWith('Not filled as expected');
@@ -260,9 +267,10 @@ describe("Limit orders", function () {
 
     // Try emergency withdraw nft
     const closeOrder = await limitOrders.callStatic.closeOrders(1);
-    const positionId = closeOrder['positionId'];
+    
+    const nftPositionId = closeOrder['nftPositionId'];
 
-    await optionScalp.callStatic.emergencyWithdrawNFTs([positionId]);
+    await optionScalp.callStatic.emergencyWithdrawNFTs([nftPositionId]);
 
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
@@ -271,6 +279,8 @@ describe("Limit orders", function () {
 
     // Kepper can also just call closePosition()
     await optionScalp.connect(user2).closePosition(1);
+
+     console.log('Test');
 
     const isActive = await limitOrders.isCloseOrderActive(1);
     expect(isActive).to.eq(false);
