@@ -192,7 +192,7 @@ describe("Limit orders", function () {
     console.log("Uniswap");
 
     // Is expired?
-    const isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
+    let isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
     expect(isOpenOrderFullFillable).to.eq(true);
 
     const isOpenOrderExpired = await limitOrders.isOpenOrderExpired(0);
@@ -200,6 +200,9 @@ describe("Limit orders", function () {
 
     // Bot is triggered
     await limitOrders.connect(user2).fillOpenOrder(0);
+
+    isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
+    expect(isOpenOrderFullFillable).to.eq(false);
 
     const position = await optionScalp.scalpPositions(1);
     console.log(position);
@@ -226,6 +229,9 @@ describe("Limit orders", function () {
 
     // Create an order to close the position
     await limitOrders.connect(user1).createCloseOrder(1, tick0, tick1);
+
+    let isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(1);
+    expect(isCloseOrderFullFillable).to.eq(false);
 
     // Bot tries to close the position but price hasn't moved and Uniswap NFT order hasn't been filled
     await expect(limitOrders.connect(user2).fillCloseOrder(1)).to.be.revertedWith('Not filled as expected');
@@ -271,6 +277,9 @@ describe("Limit orders", function () {
     const nftPositionId = closeOrder['nftPositionId'];
 
     await optionScalp.callStatic.emergencyWithdrawNFTs([nftPositionId]);
+
+    isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(1);
+    expect(isCloseOrderFullFillable).to.eq(true);
 
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
