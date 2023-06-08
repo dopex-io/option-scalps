@@ -171,7 +171,13 @@ describe("Limit orders", function () {
     await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not filled as expected');
 
     // Callstatic try cancel order
-    await limitOrders.connect(user1).callStatic.cancelOpenOrder(0);
+    await limitOrders.connect(user1).cancelOpenOrder(0);
+
+    let isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
+    expect(isOpenOrderFullFillable).to.eq(false);
+
+    await limitOrders.connect(user1).createOpenOrder(true, "5000000000", 4, collateral, tick0, tick1, {gasLimit: 4000000});
+
 
     const bf5UsdcBalance = await usdc.balanceOf(bf5Address);
     await usdc.connect(bf5).approve(uniV3Router.address, bf5UsdcBalance);
@@ -192,20 +198,17 @@ describe("Limit orders", function () {
     console.log("Uniswap");
 
     // Is expired?
-    let isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
+     isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(1);
     expect(isOpenOrderFullFillable).to.eq(true);
 
-    const isOpenOrderExpired = await limitOrders.isOpenOrderExpired(0);
-    expect(isOpenOrderExpired).to.eq(false);
-
     // Bot is triggered
-    await limitOrders.connect(user2).fillOpenOrder(0);
+    await limitOrders.connect(user2).fillOpenOrder(1);
 
-    isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
+    isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(1);
     expect(isOpenOrderFullFillable).to.eq(false);
 
     const position = await optionScalp.scalpPositions(1);
-    console.log(position);
+    // console.log(position);
     expect(position['isOpen']).to.eq(true);
     expect(position['isShort']).to.eq(true);
     expect(position['size']).to.eq('5000000000');
@@ -230,14 +233,14 @@ describe("Limit orders", function () {
     // Create an order to close the position
     await limitOrders.connect(user1).createCloseOrder(1, tick0, tick1);
 
-    let isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(1);
+    let isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(0);
     expect(isCloseOrderFullFillable).to.eq(false);
 
     // Bot tries to close the position but price hasn't moved and Uniswap NFT order hasn't been filled
-    await expect(limitOrders.connect(user2).fillCloseOrder(1)).to.be.revertedWith('Not filled as expected');
+    await expect(limitOrders.connect(user2).fillCloseOrder(0)).to.be.revertedWith('Not filled as expected');
 
     // Bot tries to cancel the order
-    await limitOrders.connect(user1).callStatic.cancelCloseOrder(1);
+    await limitOrders.connect(user1).callStatic.cancelCloseOrder(0);
 
     // Price goes down
     const bf5WethBalance = await weth.balanceOf(bf5Address);
@@ -272,26 +275,26 @@ describe("Limit orders", function () {
     expect(isLiquidatable).to.eq(false);
 
     // Try emergency withdraw nft
-    const closeOrder = await limitOrders.callStatic.closeOrders(1);
-    
+    const closeOrder = await limitOrders.closeOrders(0);
+
     const nftPositionId = closeOrder['nftPositionId'];
 
     await optionScalp.callStatic.emergencyWithdrawNFTs([nftPositionId]);
 
-    isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(1);
+    isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(0);
     expect(isCloseOrderFullFillable).to.eq(true);
 
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
     // Bot can close using fillCloseOrder
-    await limitOrders.connect(user2).callStatic.fillCloseOrder(1);
+    await limitOrders.connect(user2).callStatic.fillCloseOrder(0);
+
+    await network.provider.send("evm_increaseTime", [3700]);
 
     // Kepper can also just call closePosition()
     await optionScalp.connect(user2).closePosition(1);
 
-     console.log('Test');
-
-    const isActive = await limitOrders.isCloseOrderActive(1);
+    const isActive = await limitOrders.isCloseOrderActive(0);
     expect(isActive).to.eq(false);
 
     console.log("Other users tries to call close but it has been already closed");

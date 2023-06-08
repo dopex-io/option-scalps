@@ -21,7 +21,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Pausable} from "./helpers/Pausable.sol";
 
-
 contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, ERC721Holder {
     using SafeERC20 for IERC20;
 
@@ -40,11 +39,14 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     mapping (uint => OpenOrder) public openOrders; // identifier -> openOrder
 
-    mapping (uint => CloseOrder) public closeOrders; // position id -> closeOrder
+    mapping (uint => CloseOrder) public closeOrders; // identifier -> closeOrder
+
+    mapping(uint => bool) public closeOrderCreatedForPosition;
 
     IUniswapV3Factory uniswapV3Factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
-    uint public orderCount;
+    uint public openOrdersCount;
+    uint public closeOrdersCount;
 
     // Create open order event
     event CreateOpenOrder(uint256 id, address indexed user);
@@ -77,6 +79,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     struct CloseOrder {
       bool filled;
       uint256 nftPositionId;
+      uint256 scalpPositionId;
     }
 
     /// @notice Admin function to add an option scalp
@@ -155,7 +158,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       int24 tick1
     )
     nonReentrant
-    external {
+    external returns (uint256 orderId) {
       require(optionScalp.timeframes(timeframeIndex) != 0, "Invalid timeframe");
       require(collateral >= optionScalp.minimumMargin(), "Insufficient margin");
       require(size <= optionScalp.maxSize(), "Position exposure is too high");
@@ -177,7 +180,9 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       (isShort ? ScalpLP(optionScalp.baseLp()) : ScalpLP(optionScalp.quoteLp())).lockLiquidity(lockedLiquidity);
 
-      openOrders[orderCount] = OpenOrder({
+      orderId = openOrdersCount;
+
+      openOrders[orderId] = OpenOrder({
         user: msg.sender,
         isShort: isShort,
         filled: false,
@@ -191,11 +196,11 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       });
 
       emit CreateOpenOrder(
-        orderCount,
+        orderId,
         msg.sender
       );
 
-      orderCount++;
+      openOrdersCount++;
     }
 
     /// @notice Fill a OpenOrder
@@ -234,20 +239,24 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     }
 
     /// @notice Create a CloseOrder
-    /// @param id Order id
+    /// @param scalpPositionId Scalp position id
     /// @param tick0 Start tick of the position to create
     /// @param tick1 End tick of the position to create
     function createCloseOrder(
-        uint256 id,
+        uint256 scalpPositionId,
         int24 tick0,
         int24 tick1
     )
     nonReentrant
-    external {
-      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(id);
-      address owner = optionScalp.positionOwner(id);
+    external returns (uint256 orderId) {
+      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(scalpPositionId);
+      address owner = optionScalp.positionOwner(scalpPositionId);
       require(msg.sender == owner, "Sender not authorized");
-      require(closeOrders[id].nftPositionId == 0, "There is already an open order for this position");
+      require(!closeOrderCreatedForPosition[scalpPositionId], "There is already an open order for this position");
+
+      closeOrderCreatedForPosition[scalpPositionId] = true;
+
+      orderId = closeOrdersCount;
 
       (uint256 nftPositionId) = createPosition(
         tick0,
@@ -256,13 +265,17 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         !scalpPosition.isShort
       );
 
-     closeOrders[id] = CloseOrder({
+
+     closeOrders[orderId] = CloseOrder({
         filled: false,
-        nftPositionId: nftPositionId
+        nftPositionId: nftPositionId,
+        scalpPositionId: scalpPositionId
      });
 
+     closeOrdersCount++;
+
      emit CreateCloseOrder(
-        id,
+        orderId,
         owner
      );
     }
@@ -271,13 +284,16 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @param _id ID of the CloseOrder
     function fillCloseOrder(uint _id)
     nonReentrant
-    external returns (bool) {
+    public returns (bool) {
+
+      CloseOrder memory order = closeOrders[_id];
+
       require(
         isCloseOrderActive(_id),
         "Order is not active and unfilled"
       );
 
-      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(_id);
+      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(order.scalpPositionId);
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
 
@@ -288,7 +304,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       );
 
       optionScalp.closePositionFromLimitOrder(
-          _id,
+          order.scalpPositionId,
           swapped
       );
 
@@ -333,13 +349,17 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     function cancelCloseOrder(uint _id)
     nonReentrant
     external {
+
+      CloseOrder memory order = closeOrders[_id];
+
       require(
         isCloseOrderActive(_id),
         "Order is not active and unfilled"
       );
-      require(msg.sender == optionScalp.positionOwner(_id) || msg.sender == address(optionScalp), "Sender not authorized");
 
-      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(_id);
+      require(msg.sender == optionScalp.positionOwner(order.scalpPositionId) || msg.sender == address(optionScalp), "Sender not authorized");
+
+      OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(order.scalpPositionId);
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
 
@@ -351,20 +371,27 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       delete closeOrders[_id];
 
+      closeOrderCreatedForPosition[order.scalpPositionId] = false;
+
       emit CancelCloseOrder(_id, msg.sender);
     }
 
     /// @notice Returns true is CloseOrder is active
     /// @param _id ID of the CloseOrder
     function isCloseOrderActive(uint256 _id) public view returns (bool) {
-        return
-        !closeOrders[_id].filled &&
-        closeOrders[_id].nftPositionId != 0;
+      CloseOrder memory order = closeOrders[_id];
+
+      // Treat positions closed before limitOrder as inactive
+      if(order.nftPositionId != 0) {
+          if(!optionScalp.getPosition(order.scalpPositionId).isOpen) return false;
+        }
+
+      return !order.filled && order.nftPositionId != 0;
     }
 
     /// @notice Returns ticks of a valid nft position
     /// @param nftPositionId ID of the NFT
-    function getNFTPositionTicks(uint256 nftPositionId) public returns (int24 tickLower, int24 tickUpper) {
+    function getNFTPositionTicks(uint256 nftPositionId) public view returns (int24 tickLower, int24 tickUpper) {
         (,,,,,tickLower, tickUpper,,,,,) = INonfungiblePositionManager(optionScalp.nonFungiblePositionManager()).positions(nftPositionId);
     }
 
@@ -373,7 +400,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     function isOpenOrderFullFillable(uint256 id) public view returns (bool) {
         OpenOrder memory order = openOrders[id];
 
-        if (order.filled) return false;
+        if (order.filled || order.cancelled || block.timestamp > openOrders[id].timestamp + maxFundingTime) return false;
 
         (,,,,,int24 tickLower, int24 tickUpper,,,,,) = INonfungiblePositionManager(optionScalp.nonFungiblePositionManager()).positions(order.nftPositionId);
         address base = address(optionScalp.base());
@@ -384,16 +411,6 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         return order.isShort ? tick > tickUpper : tick < tickLower;
     }
 
-    /// @notice Returns true if can be cancelled
-    /// @param id Open order ID
-    function isOpenOrderExpired(uint256 id) public view returns (bool) {
-        OpenOrder memory order = openOrders[id];
-
-        if (order.filled) return false;
-
-        return block.timestamp > openOrders[id].timestamp + maxFundingTime;
-    }
-
     /// @notice Returns true if can be filled
     /// @param id Close order ID
     function isCloseOrderFullFillable(uint256 id) public view returns (bool) {
@@ -401,11 +418,13 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
         if (order.filled) return false;
 
-        OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(id);
+        OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(order.scalpPositionId);
 
         (,,,,,int24 tickLower, int24 tickUpper,,,,,) = INonfungiblePositionManager(optionScalp.nonFungiblePositionManager()).positions(order.nftPositionId);
+
         address base = address(optionScalp.base());
         address quote = address(optionScalp.quote());
+
         IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(base, quote, 500));
         (,int24 tick,,,,,) = pool.slot0();
 
