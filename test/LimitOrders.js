@@ -284,6 +284,9 @@ describe("Limit orders", function () {
     isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(0);
     expect(isCloseOrderFullFillable).to.eq(true);
 
+    let isActive = await limitOrders.isCloseOrderActive(0);
+    expect(isActive).to.eq(true);
+
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
     // Bot can close using fillCloseOrder
@@ -294,7 +297,7 @@ describe("Limit orders", function () {
     // Kepper can also just call closePosition()
     await optionScalp.connect(user2).closePosition(1);
 
-    const isActive = await limitOrders.isCloseOrderActive(0);
+    isActive = await limitOrders.isCloseOrderActive(0);
     expect(isActive).to.eq(false);
 
     console.log("Other users tries to call close but it has been already closed");
