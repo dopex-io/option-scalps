@@ -324,7 +324,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         "Order is not active and unfilled"
       );
 
-      if (openOrders[_id].timestamp + maxFundingTime <= block.timestamp) require(msg.sender == openOrders[_id].user, "Only order creator can call cancel before expiry");
+      if (openOrders[_id].timestamp + maxFundingTime > block.timestamp) require(msg.sender == openOrders[_id].user, "Only order creator can call cancel before expiry");
       openOrders[_id].cancelled = true;
 
       IUniswapV3Pool pool = IUniswapV3Pool(uniswapV3Factory.getPool(address(optionScalp.base()), address(optionScalp.quote()), 500));
