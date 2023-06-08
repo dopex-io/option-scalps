@@ -899,7 +899,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
     /**
      * @notice Add a contract to the whitelist
-     * @dev    Can only be called by the owner
+     * @dev Can only be called by the owner
      * @param _contract Address of the contract that needs to be added to the whitelist
      */
     function addToContractWhitelist(address _contract) external onlyOwner {
@@ -908,7 +908,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
     /**
      * @notice Add a contract to the whitelist
-     * @dev    Can only be called by the owner
+     * @dev Can only be called by the owner
      * @param _contract Address of the contract that needs to be added to the whitelist
      */
     function removeFromContractWhitelist(address _contract) external onlyOwner {
