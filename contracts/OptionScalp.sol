@@ -61,7 +61,9 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         5 minutes,
         15 minutes,
         30 minutes,
-        60 minutes
+        60 minutes,
+        120 minutes,
+        240 minutes
     ];
 
     // Address of multisig which handles insurance fund
