@@ -265,19 +265,18 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
         !scalpPosition.isShort
       );
 
-
-     closeOrders[orderId] = CloseOrder({
+      closeOrders[orderId] = CloseOrder({
         filled: false,
         nftPositionId: nftPositionId,
         scalpPositionId: scalpPositionId
-     });
+      });
 
-     closeOrdersCount++;
+      closeOrdersCount++;
 
-     emit CreateCloseOrder(
+      emit CreateCloseOrder(
         orderId,
         owner
-     );
+      );
     }
 
     /// @notice Fill a CloseOrder
@@ -384,7 +383,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       // Treat positions closed before limitOrder as inactive
       if(order.nftPositionId != 0) {
           if(!optionScalp.getPosition(order.scalpPositionId).isOpen) return false;
-        }
+      }
 
       return !order.filled && order.nftPositionId != 0;
     }
