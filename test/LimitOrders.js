@@ -21,6 +21,7 @@ describe("Limit orders", function () {
   let b50Address;
   let bf5Address;
   let keeper;
+  let minter;
 
   before(async () => {
     signers = await ethers.getSigners();
@@ -203,6 +204,13 @@ describe("Limit orders", function () {
 
     // Bot is triggered
     await limitOrders.connect(user2).fillOpenOrder(1);
+
+    // Position is created
+    const optionScalpMinterAddress = await optionScalp.scalpPositionMinter();
+    minter = await ethers.getContractAt("contracts/positions/ScalpPositionMinter.sol:ScalpPositionMinter", optionScalpMinterAddress);
+    const totalSupply = await minter.totalSupply();
+
+    expect(totalSupply).to.eq(1);
 
     isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(1);
     expect(isOpenOrderFullFillable).to.eq(false);
