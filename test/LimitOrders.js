@@ -308,6 +308,9 @@ describe("Limit orders", function () {
     isActive = await limitOrders.isCloseOrderActive(1);
     expect(isActive).to.eq(false);
 
+    const order = await limitOrders.closeOrders(1);
+    expect(order['filled']).to.eq(true);
+
     console.log("Other users tries to call close but it has been already closed");
     await expect(optionScalp.connect(user2).callStatic.closePosition(1)).to.be.revertedWith("Invalid position ID");
 
