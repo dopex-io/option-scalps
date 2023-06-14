@@ -169,12 +169,12 @@ describe("Limit orders", function () {
     await limitOrders.connect(user1).createOpenOrder(true, "5000000000", 4, collateral, tick0, tick1, {gasLimit: 4000000});
 
     // Bot tries to create order but price hasn't moved and Uniswap NFT order hasn't been filled
-    await expect(limitOrders.connect(user2).fillOpenOrder(0)).to.be.revertedWith('Not filled as expected');
+    await expect(limitOrders.connect(user2).fillOpenOrder(1)).to.be.revertedWith('Not filled as expected');
 
     // Callstatic try cancel order
-    await limitOrders.connect(user1).cancelOpenOrder(0);
+    await limitOrders.connect(user1).cancelOpenOrder(1);
 
-    let isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(0);
+    let isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(1);
     expect(isOpenOrderFullFillable).to.eq(false);
 
     await limitOrders.connect(user1).createOpenOrder(true, "5000000000", 4, collateral, tick0, tick1, {gasLimit: 4000000});
@@ -199,11 +199,11 @@ describe("Limit orders", function () {
     console.log("Uniswap");
 
     // Is expired?
-     isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(1);
+     isOpenOrderFullFillable = await limitOrders.isOpenOrderFullFillable(2);
     expect(isOpenOrderFullFillable).to.eq(true);
 
     // Bot is triggered
-    await limitOrders.connect(user2).fillOpenOrder(1);
+    await limitOrders.connect(user2).fillOpenOrder(2);
 
     // Position is created
     const optionScalpMinterAddress = await optionScalp.scalpPositionMinter();
@@ -241,14 +241,14 @@ describe("Limit orders", function () {
     // Create an order to close the position
     await limitOrders.connect(user1).createCloseOrder(1, tick0, tick1);
 
-    let isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(0);
+    let isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(1);
     expect(isCloseOrderFullFillable).to.eq(false);
 
     // Bot tries to close the position but price hasn't moved and Uniswap NFT order hasn't been filled
-    await expect(limitOrders.connect(user2).fillCloseOrder(0)).to.be.revertedWith('Not filled as expected');
+    await expect(limitOrders.connect(user2).fillCloseOrder(1)).to.be.revertedWith('Not filled as expected');
 
     // Bot tries to cancel the order
-    await limitOrders.connect(user1).callStatic.cancelCloseOrder(0);
+    await limitOrders.connect(user1).callStatic.cancelCloseOrder(1);
 
     // Price goes down
     const bf5WethBalance = await weth.balanceOf(bf5Address);
@@ -283,29 +283,29 @@ describe("Limit orders", function () {
     expect(isLiquidatable).to.eq(false);
 
     // Try emergency withdraw nft
-    const closeOrder = await limitOrders.closeOrders(0);
+    const closeOrder = await limitOrders.closeOrders(1);
 
     const nftPositionId = closeOrder['nftPositionId'];
 
     await optionScalp.callStatic.emergencyWithdrawNFTs([nftPositionId]);
 
-    isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(0);
+    isCloseOrderFullFillable = await limitOrders.isCloseOrderFullFillable(1);
     expect(isCloseOrderFullFillable).to.eq(true);
 
-    let isActive = await limitOrders.isCloseOrderActive(0);
+    let isActive = await limitOrders.isCloseOrderActive(1);
     expect(isActive).to.eq(true);
 
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
     // Bot can close using fillCloseOrder
-    await limitOrders.connect(user2).callStatic.fillCloseOrder(0);
+    await limitOrders.connect(user2).callStatic.fillCloseOrder(1);
 
     await network.provider.send("evm_increaseTime", [3700]);
 
     // Kepper can also just call closePosition()
     await optionScalp.connect(user2).closePosition(1);
 
-    isActive = await limitOrders.isCloseOrderActive(0);
+    isActive = await limitOrders.isCloseOrderActive(1);
     expect(isActive).to.eq(false);
 
     console.log("Other users tries to call close but it has been already closed");

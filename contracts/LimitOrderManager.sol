@@ -41,12 +41,12 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
     mapping (uint => CloseOrder) public closeOrders; // identifier -> closeOrder
 
-    mapping(uint => bool) public closeOrderCreatedForPosition;
+    mapping(uint => uint) public closeOrderCreatedForPosition;
 
     IUniswapV3Factory uniswapV3Factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
-    uint public openOrdersCount;
-    uint public closeOrdersCount;
+    uint public openOrdersCount = 1;
+    uint public closeOrdersCount = 1;
 
     // Create open order event
     event CreateOpenOrder(uint256 id, address indexed user);
@@ -252,11 +252,11 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
       OptionScalp.ScalpPosition memory scalpPosition = optionScalp.getPosition(scalpPositionId);
       address owner = optionScalp.positionOwner(scalpPositionId);
       require(msg.sender == owner, "Sender not authorized");
-      require(!closeOrderCreatedForPosition[scalpPositionId], "There is already an open order for this position");
-
-      closeOrderCreatedForPosition[scalpPositionId] = true;
+      require(closeOrderCreatedForPosition[scalpPositionId] == 0, "There is already an close order for this position");
 
       orderId = closeOrdersCount;
+
+      closeOrderCreatedForPosition[scalpPositionId] = orderId;
 
       (uint256 nftPositionId) = createPosition(
         tick0,
@@ -370,7 +370,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
       delete closeOrders[_id];
 
-      closeOrderCreatedForPosition[order.scalpPositionId] = false;
+      closeOrderCreatedForPosition[order.scalpPositionId] = 0;
 
       emit CancelCloseOrder(_id, msg.sender);
     }
@@ -463,4 +463,5 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
 
         emit EmergencyWithdraw(msg.sender);
     }
+
 }
