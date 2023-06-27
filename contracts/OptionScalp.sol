@@ -526,7 +526,7 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             swapped = _swapExactIn(
                 address(quote),
                 address(base),
-                scalpPositions[id].amountOut + scalpPositions[id].margin
+                scalpPositions[id].amountOut
             );
         } else {
             // base to quote
@@ -570,23 +570,37 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         scalpPositionMinter.burn(id);
 
         if (scalpPositions[id].isShort) {
-            if (swapped > scalpPositions[id].amountBorrowed) {
+            uint256 marginSwapped;
+            bool hasSwappedMargin;
+
+            if (swapped < scalpPositions[id].amountBorrowed) {
+                // trade not profitable, we swap margin to cover LP losses
+                marginSwapped = _swapExactIn(address(quote), address(base), scalpPositions[id].margin);
+                hasSwappedMargin = true;
+            }
+
+            uint256 totalSwapped = swapped + marginSwapped;
+
+            if (totalSwapped > scalpPositions[id].amountBorrowed) {
                 baseLp.unlockLiquidity(scalpPositions[id].amountBorrowed);
 
-                //convert remaining base to quote to pay for trader
+                // convert remaining base to quote to pay for trader
                 traderWithdraw = _swapExactIn(
                     address(base),
                     address(quote),
-                    swapped - scalpPositions[id].amountBorrowed
+                    totalSwapped - scalpPositions[id].amountBorrowed
                 );
+
+                // we give back margin too if hasn't been swapped
+                if (!hasSwappedMargin) traderWithdraw += scalpPositions[id].margin;
 
                 quote.safeTransfer(
                     isLiquidatable(id) ? insuranceFund : owner,
                     traderWithdraw
                 );
             } else {
-                baseLp.unlockLiquidity(swapped);
-                emit Shortfall(false, scalpPositions[id].amountBorrowed - swapped);
+                baseLp.unlockLiquidity(totalSwapped);
+                emit Shortfall(false, scalpPositions[id].amountBorrowed - totalSwapped);
             }
         } else {
             if (

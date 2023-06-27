@@ -297,13 +297,21 @@ describe("Limit orders", function () {
 
     // Even if there is a limit order it is still possible to close the position (by user or liquidation)
 
-    // Bot can close using fillCloseOrder
-    await limitOrders.connect(user2).callStatic.fillCloseOrder(1);
-
     await network.provider.send("evm_increaseTime", [3700]);
 
+    const startQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(startQuoteBalance).to.eq("6999998264");
+
     // Kepper can also just call closePosition()
-    await optionScalp.connect(user2).closePosition(1);
+    await optionScalp.connect(user2).callStatic.closePosition(1);
+
+    // Bot can close using fillCloseOrder
+    await limitOrders.connect(user2).fillCloseOrder(1);
+
+    const endQuoteBalance = await usdc.balanceOf(user1.address);
+    expect(endQuoteBalance).to.eq("10037103966");
+
+    expect(endQuoteBalance.sub(startQuoteBalance)).to.eq("3037105702"); // 3037.10 USDC
 
     isActive = await limitOrders.isCloseOrderActive(1);
     expect(isActive).to.eq(false);
