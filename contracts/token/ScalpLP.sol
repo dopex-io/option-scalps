@@ -190,4 +190,8 @@ contract ScalpLP is ERC4626 {
         // deposit into scalp
         asset.safeTransfer(address(scalp), assets);
     }
+
+    function mint(uint256 shares, address receiver) public virtual override returns (uint256) {
+        revert("Direct mint is disabled");
+    }
 }

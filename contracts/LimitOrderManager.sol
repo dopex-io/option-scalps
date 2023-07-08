@@ -283,7 +283,7 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
     /// @param _id ID of the CloseOrder
     function fillCloseOrder(uint _id)
     nonReentrant
-    public returns (bool) {
+    public returns (int256) {
 
       CloseOrder memory order = closeOrders[_id];
 
@@ -302,14 +302,14 @@ contract LimitOrderManager is Ownable, Pausable, ReentrancyGuard, ContractWhitel
           !scalpPosition.isShort
       );
 
-      optionScalp.closePositionFromLimitOrder(
+      int256 pnl = optionScalp.closePositionFromLimitOrder(
           order.scalpPositionId,
           swapped
       );
 
       closeOrders[_id].filled = true;
 
-      return true;
+      return pnl;
     }
 
     /// @notice Cancel OpenOrder

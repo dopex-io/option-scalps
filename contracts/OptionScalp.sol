@@ -499,7 +499,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
 
     /// @notice Closes an open position
     /// @param id ID of position
-    function closePosition(uint256 id) public returns (bool) {
+    /// @return pnl Final pnl
+    function closePosition(uint256 id) public returns (int256) {
         _isEligibleSender();
         require(scalpPositions[id].isOpen, "Invalid position ID");
 
@@ -537,26 +538,28 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
             );
         }
 
-        settlePosition(id, swapped);
+        int256 pnl = settlePosition(id, swapped);
 
-        return true;
+        return pnl;
     }
 
     /// @notice Closes an open position from a limit order
     /// @param id ID of position
     /// @param swapped Amount obtained from the swap
-    function closePositionFromLimitOrder(uint256 id, uint256 swapped) public {
+    /// @return pnl Final pnl
+    function closePositionFromLimitOrder(uint256 id, uint256 swapped) public returns (int256) {
         require(msg.sender == address(limitOrderManager));
         require(scalpPositions[id].isOpen, "Invalid position ID");
         require(swapped > 0, "Order not filled");
 
-        settlePosition(id, swapped);
+        return settlePosition(id, swapped);
     }
 
     /// @notice Internal function called to finalize a position close
     /// @param id ID of position
     /// @param swapped Amount obtained from the swap
-    function settlePosition(uint256 id, uint256 swapped) internal {
+    /// @return pnl Final pnl
+    function settlePosition(uint256 id, uint256 swapped) internal returns (int256) {
         require(
             scalpPositions[id].openedAt + 1 seconds <= block.timestamp,
             "Position must be open for at least 1 second"
@@ -631,6 +634,8 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
         cumulativeVolume[owner] += scalpPositions[id].size;
 
         emit ClosePosition(id, pnl, msg.sender);
+
+        return pnl;
     }
 
     /// @notice Returns whether an open position is liquidatable
