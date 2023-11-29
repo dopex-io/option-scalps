@@ -72,4 +72,11 @@ contract ScalpPositionMinter is
       return super.supportsInterface(interfaceId);
   }
 
+  function totalSupply()
+    public
+    view
+    override
+    returns (uint256) {
+      return _tokenIdCounter._value - 1; // Token id starts from 1
+  }
 }

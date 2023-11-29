@@ -5,7 +5,7 @@ interface IOptionScalp {
 
     function isLiquidatable(uint256 id) external view returns (bool);
 
-    function closePosition(uint256 id) external;
+    function closePosition(uint256 id) external returns (int256 pnl);
 
     struct ScalpPosition {
         // Is position open
@@ -35,4 +35,6 @@ interface IOptionScalp {
         // How long position is to be kept open
         uint256 timeframe;
     }
+
+    function nonFungiblePositionManager() external returns(address);
 }

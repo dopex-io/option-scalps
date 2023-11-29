@@ -22,6 +22,9 @@ contract ScalpLP is ERC4626 {
     /// @dev The address of the scalp contract creating the lp token
     OptionScalp public scalp;
 
+    /// @dev The address of limit orders manager
+    address public limitOrdersManager;
+
     /// @dev The address of the collateral contract for the scalp lp
     ERC20 public collateral;
 
@@ -43,15 +46,18 @@ contract ScalpLP is ERC4626 {
     /*==== CONSTRUCTOR ====*/
     /**
      * @param _scalp The address of the scalp contract creating the lp token
+     * @param _limitOrdersManager The address of the limit orders manager
      * @param _collateral The address of the collateral asset in the scalp contract
      * @param _collateralSymbol The symbol of the collateral asset token
      */
     constructor(
         address _scalp,
+        address _limitOrdersManager,
         address _collateral,
         string memory _collateralSymbol
     ) ERC4626(ERC20(_collateral), "Scalp LP Token", "ScLP") {
         scalp = OptionScalp(_scalp);
+        limitOrdersManager = _limitOrdersManager;
         collateralSymbol = _collateralSymbol;
 
         symbol = concatenate(_collateralSymbol, "-LP");
@@ -150,12 +156,12 @@ contract ScalpLP is ERC4626 {
     }
 
     function lockLiquidity(uint amount) public  {
-        require(msg.sender == address(scalp), "Only scalp can call this function");
+        require(msg.sender == address(scalp) || msg.sender == address(limitOrdersManager), "Only scalp or limit orders manager can call this function");
         _lockedLiquidity += amount;
     }
 
     function unlockLiquidity(uint amount) public {
-        require(msg.sender == address(scalp), "Only scalp can call this function");
+        require(msg.sender == address(scalp) || msg.sender == address(limitOrdersManager), "Only scalp or limit orders manager can call this function");
         _lockedLiquidity -= amount;
     }
 
@@ -183,5 +189,9 @@ contract ScalpLP is ERC4626 {
         asset.safeApprove(address(scalp), assets);
         // deposit into scalp
         asset.safeTransfer(address(scalp), assets);
+    }
+
+    function mint(uint256 shares, address receiver) public virtual override returns (uint256) {
+        revert("Direct mint is disabled");
     }
 }

@@ -2,28 +2,19 @@ const { ethers } = require("hardhat");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deployer } = await getNamedAccounts();
+  let limitOrders;
 
   // USDC
   const usdc = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8");
   // WETH
   const weth = await ethers.getContractAt("contracts/interface/IWETH9.sol:IWETH9", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1");
-  // WBTC
-  const wbtc = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f");
+  // ARB
+  const arb = await ethers.getContractAt("contracts/interface/IERC20.sol:IERC20", "0x912CE59144191C1204E64559FE8253a0e49E6548");
 
-  const optionPricingSimple = await deployments.deploy("OptionPricingSimple", {
-    args: [
-      1000,
-      1
-    ],
-    from: deployer,
-    log: true,
-  });
+  const LimitOrders = await ethers.getContractFactory("LimitOrderManager");
+  limitOrders = await LimitOrders.deploy([]);
 
-  const volatilityOracleSimple = await deployments.deploy("VolatilityOracleSimple", {
-    args: [],
-    from: deployer,
-    log: true,
-  });
+  const insuranceFund = "0x55594cce8cc0014ea08c49fd820d731308f204c1";
 
   const wethOptionScalp = await deployments.deploy("OptionScalp", {
     args: [
@@ -32,17 +23,19 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
       18,
       6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
-      "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
+      limitOrders.address,
+      "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", // UNI V3 NFT Manager
       [
           "100000000000",  // $100.000
           "10000000000000",  // $10M
-          optionPricingSimple.address,
-          volatilityOracleSimple.address,
-          "0x19e6eE4C2cBe7Bcc4cd1ef0BCF7e764fECe23cC6",
-          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
+          "0x35cfa5ac5edb29769f92e16b6b68efa60b810a8e", // option pricing
+          "0xa03f6f7c2b7fe70fcaf05c98f4fb083087ba58fd", // volatility oracle
+          "0x19e6ee4c2cbe7bcc4cd1ef0bcf7e764fece23cc6", // price oracle
+          insuranceFund, // Insurance fund
           "10000000", // $10
           "5000000", // 0.05%
-          "5000000",  // $5
+          "3000",
+          "3600"
       ]
     ],
     from: deployer,
@@ -51,35 +44,33 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 
   console.log(wethOptionScalp.address);
 
-  const wbtcethPriceOracle = await deployments.deploy("EthBtcPriceOracle", {
-     args: [],
-     from: deployer,
-     logs: true,
-  });
-
-  const wbtcOptionScalp = await deployments.deploy("OptionScalp", {
+  const arbOptionScalp = await deployments.deploy("OptionScalp", {
     args: [
-      wbtc.address,
-      weth.address,
-      8,
+      arb.address,
+      usdc.address,
       18,
+      6,
       "0xE592427A0AEce92De3Edee1F18E0157C05861564", // UNI V3 ROUTER
-      "0xa028B56261Bb1A692C06D993c383c872B51AfB33", // GMX HELPER
+      limitOrders.address,
+      "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", // UNI V3 NFT Manager
       [
-          "10000000000000000000",  // 10 ETH
-          "1000000000000000000000",  // 1000 ETH
-          optionPricingSimple.address,
-          volatilityOracleSimple.address,
-          wbtcethPriceOracle.address,
-          "0xB50F58D50e30dFdAAD01B1C6bcC4Ccb0DB55db13", // Insurance fund
-          "5000000000000000", // 0.005
+          "10000000000",  // $10.000
+          "10000000000000",  // $10M
+          "0x35cfa5ac5edb29769f92e16b6b68efa60b810a8e", // option pricing
+          "0xa03f6f7c2b7fe70fcaf05c98f4fb083087ba58fd", // volatility oracle
+          "0xbdb0f3330d4b32b3133738451c8237d0a8af3081", // price oracle
+          insuranceFund, // Insurance fund
+          "10000000", // $10
           "5000000", // 0.05%
-          "2500000000000000",  // 0.0025
+          "4000",
+          "3600"
       ]
     ],
     from: deployer,
     log: true,
   });
 
-  console.log(wbtcOptionScalp.address);
+  console.log(arbOptionScalp.address);
+
+  await limitOrders.addOptionScalps([wethOptionScalp.address, arbOptionScalp.address]);
 };

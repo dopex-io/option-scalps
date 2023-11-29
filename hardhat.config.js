@@ -1,4 +1,5 @@
 require("dotenv").config();
+require('solidity-coverage');
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("@atixlabs/hardhat-time-n-mine");
