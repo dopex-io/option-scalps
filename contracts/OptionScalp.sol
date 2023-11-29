@@ -655,22 +655,12 @@ contract OptionScalp is Ownable, Pausable, ReentrancyGuard, ContractWhitelist, E
     ) public view returns (uint256 price) {
         if(!scalpPositions[id].isOpen) return 0;
 
-        int256 threshold = int256(scalpPositions[id].margin) -
-            int256(
-                (minimumAbsoluteLiquidationThreshold *
-                    scalpPositions[id].size) / (10 ** quoteDecimals)
-            );
+        uint256 variation = ((scalpPositions[id].margin * (10 ** quoteDecimals)) - (minimumAbsoluteLiquidationThreshold * scalpPositions[id].size)) / scalpPositions[id].positions;
 
         if (scalpPositions[id].isShort) {
-            price =
-                scalpPositions[id].entry +
-                (((10 ** quoteDecimals) * uint(threshold)) /
-                    scalpPositions[id].size); // (quoteDecimals)
+            price = scalpPositions[id].entry + variation;
         } else {
-            price =
-                scalpPositions[id].entry -
-                (((10 ** quoteDecimals) * uint(threshold)) /
-                    scalpPositions[id].size); // (quoteDecimals)
+            price = scalpPositions[id].entry - variation;
         }
     }
 
